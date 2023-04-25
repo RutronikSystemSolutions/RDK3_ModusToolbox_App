@@ -1,16 +1,8 @@
 /******************************************************************************
 * File Name: host_main.c
 *
-* Version: 1.10
 *
-* Description: This is the source code for BLE GATT Server with custom 
-*              throughput service. The BLE sends notification data to the BLE
-*              GATT client device which is used by the client for BLE 
-*              throughput measurement. 
-*
-* Related Document: CE222046_Throughput_Measurement.pdf
-*
-* Hardware Dependency: See CE222046_Throughput_Measurement.pdf
+* Description: This is the source code for the RDK3 MTB Application
 *
 *******************************************************************************
 * Copyright (2018), Cypress Semiconductor Corporation. All rights reserved.
@@ -42,10 +34,16 @@
 * including Cypress’s product in a High Risk Product, the manufacturer of such 
 * system or application assumes all risk of such use and in doing so agrees to 
 * indemnify Cypress against all liability.
+*
+* Rutronik Elektronische Bauelemente GmbH Disclaimer: The evaluation board
+* including the software is for testing purposes only and,
+* because it has limited functions and limited resilience, is not suitable
+* for permanent use under real conditions. If the evaluation board is
+* nevertheless used under real conditions, this is done at one’s responsibility;
+* any liability of Rutronik is insofar excluded
 *******************************************************************************/
 
 #include "host_main.h"
-
 #include "cy_pdl.h"
 #include "cyhal.h"
 #include "cybsp.h"
@@ -54,7 +52,6 @@
 #include "cycfg.h"
 #include "cycfg_ble.h"
 #include "stdio.h"
-
 
 /******************************************************************************
 * Macros
@@ -76,14 +73,10 @@
 #define CUSTOM_UART_DECL_HANDLE		cy_ble_customsConfig.attrInfo[0].customServInfo[0].customServCharDesc[0]
 #define CUSTOM_UART_CHAR_HANDLE		cy_ble_customsConfig.attrInfo[0].customServInfo[0].customServCharHandle
 
-
-
-static host_main_t app;
-
-
 /*******************************************************************************
 * Variables
 *******************************************************************************/
+static host_main_t app;
 uint8 uart_arr[NOTIFICATION_PKT_SIZE];
 uint16 negotiatedMtu = DEFAULT_MTU_SIZE;
 cy_stc_ble_conn_handle_t appConnHandle;
@@ -105,7 +98,7 @@ const cy_stc_sysint_t blessIsrCfg =
 void BlessInterrupt(void);
 void IasEventHandler(uint32_t event, void *eventParam);
 void StackEventHandler(uint32 event, void* eventParam);
-void SendAnswerNotification(uint16_t len, uint8_t* content);
+void SendNotification(uint16_t len, uint8_t* content);
 
 /*******************************************************************************
 * Function Name: HostMain()
@@ -207,7 +200,7 @@ int host_main_do()
     		{
     			if(Cy_BLE_GATT_GetBusyStatus(appConnHandle.attId) == CY_BLE_STACK_STATE_FREE)
     			{
-        			SendAnswerNotification(app.ack_len, app.ack_content);
+        			SendNotification(app.ack_len, app.ack_content);
         			app.ack_to_send = 0;
     			}
     		}
@@ -228,7 +221,7 @@ int host_main_do()
     				if(Cy_BLE_GATT_GetBusyStatus(appConnHandle.attId) == CY_BLE_STACK_STATE_FREE)
     				{
         				notification_t* notification = (notification_t*)app.notification_list.last->content;
-        				SendAnswerNotification(notification->length, notification->data);
+        				SendNotification(notification->length, notification->data);
         				linked_list_remove_last_element(&app.notification_list);
     				}
     			}
@@ -699,10 +692,14 @@ void StackEventHandler(uint32 event, void* eventParam)
     }
 }
 
-void SendAnswerNotification(uint16_t len, uint8_t* content)
+void SendNotification(uint16_t len, uint8_t* content)
 {
     cy_en_ble_api_result_t apiResult;
 
+    if(len > NOTIFICATION_PKT_SIZE)
+    {
+    	DEBUG_BLE("Couldn't send notification. Notification package is to large. \r\n");
+    }
 
     notificationPacket.handleValPair.value.len = len;
     for(uint16 i = 0; i < len; ++i)
@@ -719,6 +716,8 @@ void SendAnswerNotification(uint16_t len, uint8_t* content)
     {
         DEBUG_BLE("Attrhandle = 0x%4X  Cy_BLE_GATTS_Notification API Error: 0x%2.2x \r\n", notificationPacket.handleValPair.attrHandle, apiResult);
     }
+
+    DEBUG_BLE("Notification data sent: %d \r\n", len);
 
     // Set back
     notificationPacket.handleValPair.value.len = NOTIFICATION_PKT_SIZE;
