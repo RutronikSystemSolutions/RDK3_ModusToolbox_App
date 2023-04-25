@@ -628,6 +628,7 @@ void StackEventHandler(uint32 event, void* eventParam)
            
 			if(write_req_param->handleValPair.attrHandle == (CUSTOM_UART_DECL_HANDLE))
             {
+				Cy_BLE_GATTS_WriteAttributeValuePeer(&write_req_param->connHandle, &write_req_param->handleValPair);
                 if(Cy_BLE_GATTS_WriteRsp(write_req_param->connHandle) != CY_BLE_SUCCESS)
                 {
                     DEBUG_BLE("Failed to send write response \r\n");
