@@ -1,12 +1,6 @@
-# RDK3 BLE Throughput Measurement Server
+# RDK3 ModusToolbox Application (for Rutronik Android, iOS GUI)
 
-Rutronik Development Kit 3 Programmable System-on-Chip CYB06447BZI-BLD53 "RDK3 BLE Throughput Measurement Server" Code Example. 
-
-This is a code example for the BLE 5.1 Throughput Measurement GATT server device. Two RDK3 development kits are needed for this demo to function. One functions as a GATT server and the other one as a GATT client device. 
-
-The code example was written referring to the “CE222046 – PSoC 6 BLE Throughput Measurement”.
-
-<img src="images/rdk3_top.jpg" style="zoom:35%;" />
+Rutronik Development Kit 3 Programmable System-on-Chip CYB06447BZI-BLD53 "RDK3 ModusToolbox Application" Code Example. 
 
 ## Requirements
 
@@ -35,9 +29,7 @@ Please note that the “[Secure Policy Configurator](https://www.infineon.com/dg
 
 ### Operation
 
-The GATT server startups with the advertisement of the custom Throughput Service and Bluetooth Address 00:A0:50:AA:BB:FF. If a client device finds the address online it connects to the server. The server device starts notifying the client: 
 
-<img src="images/debug_output.png" style="zoom:100%;" />
 
 ### Debugging
 
