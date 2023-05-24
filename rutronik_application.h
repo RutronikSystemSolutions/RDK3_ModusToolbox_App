@@ -12,6 +12,7 @@
 
 #include "sgp40/sensirion_gas_index_algorithm.h"
 #include "scd41/scd41_app.h"
+#include "filter/lowpassfilter.h"
 
 typedef struct
 {
@@ -23,6 +24,8 @@ typedef struct
 	scd41_app_t scd41_app;
 
 	uint16_t prescaler;
+
+	lowpassfilter_t filtered_voltage;
 
 } rutronik_application_t;
 

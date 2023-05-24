@@ -1,8 +1,16 @@
 /******************************************************************************
 * File Name: host_main.c
 *
+* Version: 1.10
 *
-* Description: This is the source code for the RDK3 MTB Application
+* Description: This is the source code for BLE GATT Server with custom 
+*              throughput service. The BLE sends notification data to the BLE
+*              GATT client device which is used by the client for BLE 
+*              throughput measurement. 
+*
+* Related Document: CE222046_Throughput_Measurement.pdf
+*
+* Hardware Dependency: See CE222046_Throughput_Measurement.pdf
 *
 *******************************************************************************
 * Copyright (2018), Cypress Semiconductor Corporation. All rights reserved.
@@ -34,16 +42,10 @@
 * including Cypress’s product in a High Risk Product, the manufacturer of such 
 * system or application assumes all risk of such use and in doing so agrees to 
 * indemnify Cypress against all liability.
-*
-* Rutronik Elektronische Bauelemente GmbH Disclaimer: The evaluation board
-* including the software is for testing purposes only and,
-* because it has limited functions and limited resilience, is not suitable
-* for permanent use under real conditions. If the evaluation board is
-* nevertheless used under real conditions, this is done at one’s responsibility;
-* any liability of Rutronik is insofar excluded
 *******************************************************************************/
 
 #include "host_main.h"
+
 #include "cy_pdl.h"
 #include "cyhal.h"
 #include "cybsp.h"
@@ -53,13 +55,14 @@
 #include "cycfg_ble.h"
 #include "stdio.h"
 
+
 /******************************************************************************
 * Macros
 *******************************************************************************/
 #define ENABLE      (1u)
 #define DISABLE     (0u)
 
-#define DEBUG_BLE_ENABLE    ENABLE
+#define DEBUG_BLE_ENABLE    DISABLE
 
 #if DEBUG_BLE_ENABLE
 #define DEBUG_BLE       printf
@@ -67,18 +70,27 @@
 #define DEBUG_BLE(...)
 #endif
 
+#define MAX_MTU_SIZE                (512)
+#define DEFAULT_MTU_SIZE            (23) 
 #define NOTIFICATION_PKT_SIZE       (495)
-#define DEFAULT_MTU_SIZE            (23)
 #define SUCCESS                     (0u)
-#define CUSTOM_UART_DECL_HANDLE		cy_ble_customsConfig.attrInfo[0].customServInfo[0].customServCharDesc[0]
-#define CUSTOM_UART_CHAR_HANDLE		cy_ble_customsConfig.attrInfo[0].customServInfo[0].customServCharHandle
+#define TARGET_BDADDR       {{0xFF, 0xBB, 0xAA, 0x50, 0xA0, 0x00}, 0}
+#define CUSTOM_ACC_X_DECL_HANDLE		cy_ble_customsConfig.attrInfo[0].customServInfo[0].customServCharDesc[0]
+#define CUSTOM_ACC_X_CHAR_HANDLE			cy_ble_customsConfig.attrInfo[0].customServInfo[0].customServCharHandle
+
+
+
+static host_main_t app;
+
 
 /*******************************************************************************
 * Variables
 *******************************************************************************/
-static host_main_t app;
-uint8 uart_arr[NOTIFICATION_PKT_SIZE];
+//bool charNotificationEnabled = false;
+uint8 accx_value[NOTIFICATION_PKT_SIZE];
+uint32_t counter = 0;
 uint16 negotiatedMtu = DEFAULT_MTU_SIZE;
+cy_stc_ble_gap_bd_addr_t    local_addr = TARGET_BDADDR;
 cy_stc_ble_conn_handle_t appConnHandle;
 cy_stc_ble_gatts_handle_value_ntf_t notificationPacket;
 /* BLESS interrupt configuration.
@@ -98,7 +110,10 @@ const cy_stc_sysint_t blessIsrCfg =
 void BlessInterrupt(void);
 void IasEventHandler(uint32_t event, void *eventParam);
 void StackEventHandler(uint32 event, void* eventParam);
-void SendNotification(uint16_t len, uint8_t* content);
+void SendNotification(void);
+void SendAnswerNotification(uint16_t len, uint8_t* content);
+
+//static uint16_t sendsomething = 0;
 
 /*******************************************************************************
 * Function Name: HostMain()
@@ -144,10 +159,11 @@ int host_main_is_ready_for_notification()
 	return 1;
 }
 
+
+
 int host_main_do()
 {
-	enum commands
-	{
+	enum commands {
 		CMD_GET_AVAILABLE_SENSORS = 0,
 		CMD_START_PUSH_MODE = 1,
 		CMD_STOP_PUSH_MODE = 2
@@ -185,6 +201,7 @@ int host_main_do()
 				printf("Activate configuration mode \r\n");
 				app.mode = BLE_MODE_CONFIGURATION;
 				break;
+
     	}
 
     	app.cmd_to_process = 0;
@@ -198,11 +215,9 @@ int host_main_do()
     		// Any acknowledge to be sent?
     		if (app.ack_to_send != 0)
     		{
-    			if(Cy_BLE_GATT_GetBusyStatus(appConnHandle.attId) == CY_BLE_STACK_STATE_FREE)
-    			{
-        			SendNotification(app.ack_len, app.ack_content);
-        			app.ack_to_send = 0;
-    			}
+    			SendAnswerNotification(app.ack_len, app.ack_content);
+    			counter++;
+    			app.ack_to_send = 0;
     		}
 
     		// Push mode?
@@ -218,12 +233,9 @@ int host_main_do()
     			// Something inside the list
     			if (app.notification_list.element_count > 0)
     			{
-    				if(Cy_BLE_GATT_GetBusyStatus(appConnHandle.attId) == CY_BLE_STACK_STATE_FREE)
-    				{
-        				notification_t* notification = (notification_t*)app.notification_list.last->content;
-        				SendNotification(notification->length, notification->data);
-        				linked_list_remove_last_element(&app.notification_list);
-    				}
+    				notification_t* notification = (notification_t*)app.notification_list.last->content;
+    				SendAnswerNotification(notification->length, notification->data);
+    				linked_list_remove_last_element(&app.notification_list);
     			}
     		}
     	}
@@ -248,6 +260,123 @@ int host_main_do()
 	return 0;
 }
 
+//int HostMain(void)
+//{
+////    //__enable_irq(); /* Enable global interrupts. */
+////
+////    /* \x1b[2J\x1b[;H - ANSI ESC sequence for clear screen */
+////    printf("\x1b[2J\x1b[;H");
+////
+////    printf("RDK3 BLE Throughput Measurement\r\n");
+////    printf("Role : Server\r\n");
+////
+////    /* Initialize BLE */
+////    //Ble_Init();
+////
+////    uint32_t startTick = 0x00FFFFFF;
+////    Cy_SysTick_Init(CY_SYSTICK_CLOCK_SOURCE_CLK_LF, startTick);
+////    Cy_SysTick_Enable();
+//
+////    int i = 0;
+////
+////    for(;;)
+////    {
+////    	uint32_t tick = Cy_SysTick_GetValue();
+////    	printf("tick %ld \r\n", tick);
+////    	Cy_SysLib_Delay(250);
+////
+////    	i++;
+////    	if (i > 5)
+////    	{
+////    		Cy_SysTick_Clear();
+////    		printf("clear \r\n");
+////    		i = 0;
+////    	}
+////    }
+//
+//
+//	// 778 -> 100ms ...
+//
+//    uint16_t len = 10;
+//
+//    /* Variable 'buffer' holds dummy notification data to be send for
+//       BLE throughput measurement */
+////    for(uint16_t i=0; i < NOTIFICATION_PKT_SIZE; i++)
+////    {
+////        accx_value[i]=i;
+////    }
+//    for(;;)
+//    {
+//        /* Cy_Ble_ProcessEvents() allows BLE stack to process pending events */
+//        Cy_BLE_ProcessEvents();
+//
+//
+//		if(app.notification_enabled != 0)
+//		{
+//			if(Cy_BLE_GATT_GetBusyStatus(appConnHandle.attId) == CY_BLE_STACK_STATE_FREE)
+//			{
+//				if (sendsomething == 1)
+//				{
+//					sendsomething = 0;
+//					printf("send notification \r\n");
+//					/* Send notification data to the GATT Client*/
+//					// SendNotification();
+//					// SendAnswerNotification(len, Cy_SysTick_GetValue());
+//					SendAnswerNotification(len, counter);
+//					if (len == 10) len = 20;
+//					else len = 10;
+//
+//					counter++;
+//				}
+//			}
+//		}
+//
+////        uint32_t tick = Cy_SysTick_GetValue();
+////        if (tick > startTick)
+////        {
+////        	// Should never be the case, but well, who knows :-p
+////        	Cy_SysTick_Clear();
+////        	continue;
+////        }
+////        else
+////        {
+////        	uint32_t diff = startTick - tick;
+////        	if (diff > 24000)
+////        	{
+////        		Cy_SysTick_Clear();
+////
+////        		if(app.notification_enabled != 0)
+////				{
+////					if(Cy_BLE_GATT_GetBusyStatus(appConnHandle.attId) == CY_BLE_STACK_STATE_FREE)
+////					{
+////						printf("send notification \r\n");
+////						/* Send notification data to the GATT Client*/
+////						// SendNotification();
+////						SendAnswerNotification(len);
+////						if (len == 10) len = 20;
+////						else len = 10;
+////					}
+////				}
+////        	}
+////        }
+//
+//    }
+//
+//    return 0;
+//}
+
+/*******************************************************************************
+* Function Name: Ble_Init()
+********************************************************************************
+*
+* Summary:
+*   This function initializes BLE.
+*
+* Return:
+*   None
+*
+*******************************************************************************/
+
 static void free_notification(void* notification)
 {
 	notification_t* casted = (notification_t*) notification;
@@ -265,17 +394,6 @@ static void init_app()
 	linked_list_init(&app.notification_list, free_notification);
 }
 
-/*******************************************************************************
-* Function Name: Ble_Init()
-********************************************************************************
-*
-* Summary:
-*   This function initializes BLE.
-*
-* Return:
-*   None
-*
-*******************************************************************************/
 void Ble_Init(rutronik_application_t* rutronik_app)
 {
     cy_en_ble_api_result_t apiResult;
@@ -287,7 +405,10 @@ void Ble_Init(rutronik_application_t* rutronik_app)
 	init_app();
 	app.rutronik_app = rutronik_app;
 
-	memset(uart_arr, 0x00, sizeof(uart_arr));
+	for(uint16_t i=0; i < NOTIFICATION_PKT_SIZE; i++)
+	{
+		accx_value[i]=i;
+	}
 
     /* Initialize the BLESS interrupt */
     cy_ble_config.hw->blessIsrConfig = &blessIsrCfg;
@@ -335,7 +456,7 @@ void Ble_Init(rutronik_application_t* rutronik_app)
 *******************************************************************************/
 void StackEventHandler(uint32 event, void* eventParam)
 {
-	cy_en_ble_api_result_t apiResult;
+    cy_en_ble_api_result_t apiResult;
 
     switch(event)
     {
@@ -349,6 +470,17 @@ void StackEventHandler(uint32 event, void* eventParam)
         case CY_BLE_EVT_STACK_ON:
         {
             DEBUG_BLE("CY_BLE_EVT_STACK_ON, Start Advertisement \r\n");    
+            
+            apiResult = Cy_BLE_GAP_SetBdAddress((cy_stc_ble_gap_bd_addr_t  *)&local_addr);
+            
+            if(apiResult != CY_BLE_SUCCESS)
+            {   
+                DEBUG_BLE("Cy_BLE_GAP_SetBdAddress API Error: %d \r\n",
+                    apiResult);
+            }
+                        
+             DEBUG_BLE("CUSTOM_SERV0_CHAR0_DESC0_HANDLE (%d)""\r\nCUSTOM_SERV0_CHAR0_HANDLE(%d)\r\n",CUSTOM_ACC_X_DECL_HANDLE, CUSTOM_ACC_X_CHAR_HANDLE);
+            
             /* Enter into discoverable mode so that remote device can search it */
             Cy_BLE_GAPP_StartAdvertisement(CY_BLE_ADVERTISING_FAST, CY_BLE_PERIPHERAL_CONFIGURATION_0_INDEX);
             
@@ -390,6 +522,28 @@ void StackEventHandler(uint32 event, void* eventParam)
         /* This event indicates set device address command completed. */
         case CY_BLE_EVT_SET_DEVICE_ADDR_COMPLETE:
         {
+            DEBUG_BLE("CY_BLE_EVT_SET_DEVICE_ADDR_COMPLETE \r\n");
+            
+            cy_stc_ble_events_param_generic_t *param = \
+			(cy_stc_ble_events_param_generic_t *) eventParam;
+        
+            if( param->status != SUCCESS)
+            {
+                DEBUG_BLE("Failed to Set Local BDAddress [Status 0x%02X]\r\n",\
+                    param->status);
+               
+            }
+            else
+            {
+                DEBUG_BLE("Local Address Set successfully \r\n");
+                DEBUG_BLE("BdAddress set to: %02X:%02X:%02X:%02X:%02X:%02X \r\n",\
+                    local_addr.bdAddr[5],local_addr.bdAddr[4], local_addr.bdAddr[3],\
+                    local_addr.bdAddr[2], local_addr.bdAddr[1], local_addr.bdAddr[0]);  
+                          
+                Cy_BLE_GAPP_StartAdvertisement(CY_BLE_ADVERTISING_FAST,\
+				CY_BLE_PERIPHERAL_CONFIGURATION_0_INDEX);
+            }
+            
             break;
         }
             
@@ -397,6 +551,16 @@ void StackEventHandler(uint32 event, void* eventParam)
            successfully */
         case CY_BLE_EVT_GET_DEVICE_ADDR_COMPLETE:
         {
+			DEBUG_BLE("CY_BLE_EVT_GET_DEVICE_ADDR_COMPLETE: ");
+            DEBUG_BLE("\n\rAdvertising with Address: ");
+            for(uint8_t i = CY_BLE_GAP_BD_ADDR_SIZE; i > 0u; i--)
+            {
+                DEBUG_BLE("%2.2X ", ((cy_stc_ble_bd_addrs_t *)\
+				((cy_stc_ble_events_param_generic_t *)eventParam)->eventParams)\
+				  ->publicBdAddr[i-1]);
+            }
+            DEBUG_BLE("\r\n");
+            
             break;
 		}
         /* This event indicates set Tx Power command completed. */
@@ -458,25 +622,26 @@ void StackEventHandler(uint32 event, void* eventParam)
         {
             DEBUG_BLE("CY_BLE_EVT_DATA_LENGTH_CHANGE \r\n");
             cy_stc_ble_set_phy_info_t phyParam;
-
+            
             /* Configure the BLE Component for 2Mbps data rate */
             phyParam.bdHandle = appConnHandle.bdHandle;
             phyParam.allPhyMask = CY_BLE_PHY_NO_PREF_MASK_NONE;
             phyParam.phyOption = 0;
             phyParam.rxPhyMask = CY_BLE_PHY_MASK_LE_2M;
             phyParam.txPhyMask = CY_BLE_PHY_MASK_LE_2M;
-
+            
             Cy_BLE_EnablePhyUpdateFeature();
             apiResult = Cy_BLE_SetPhy(&phyParam);
             if(apiResult != CY_BLE_SUCCESS)
             {
-                DEBUG_BLE("Failed to set PHY..[bdHandle 0x%02X] : 0x%4x\r\n", phyParam.bdHandle, apiResult);
+                DEBUG_BLE("Failed to set PHY..[bdHandle 0x%02X] : 0x%4x\r\n",
+                    phyParam.bdHandle, apiResult);
             }
             else
             {
                 DEBUG_BLE("Setting PHY.[bdHandle 0x%02X] \r\n", phyParam.bdHandle);
             }
-
+            
             break;
         }
         
@@ -500,11 +665,12 @@ void StackEventHandler(uint32 event, void* eventParam)
             }
             
             /* Device disconnected; restart advertisement */
-			negotiatedMtu = DEFAULT_MTU_SIZE;
-            Cy_BLE_GAPP_StartAdvertisement(CY_BLE_ADVERTISING_FAST,CY_BLE_PERIPHERAL_CONFIGURATION_0_INDEX);
-
+            negotiatedMtu = DEFAULT_MTU_SIZE;
+            Cy_BLE_GAPP_StartAdvertisement(CY_BLE_ADVERTISING_FAST,\
+                CY_BLE_PERIPHERAL_CONFIGURATION_0_INDEX);
+            
             break;
-		}
+		}            
         /* This event is generated at the GAP Central and the peripheral end 
            after connection parameter update is requested from the host to 
            the controller. */
@@ -518,7 +684,8 @@ void StackEventHandler(uint32 event, void* eventParam)
 		case CY_BLE_EVT_SET_PHY_COMPLETE:
         {
             DEBUG_BLE("Updating the Phy.....\r\n");
-            cy_stc_ble_events_param_generic_t * param = (cy_stc_ble_events_param_generic_t *) eventParam;
+            cy_stc_ble_events_param_generic_t * param =\
+            (cy_stc_ble_events_param_generic_t *) eventParam;
             if(param->status ==SUCCESS)
             {
                 DEBUG_BLE("SET PHY updated to 2 Mbps\r\n");
@@ -529,36 +696,47 @@ void StackEventHandler(uint32 event, void* eventParam)
                 DEBUG_BLE("SET PHY Could not update to 2 Mbps\r\n");
                 Cy_BLE_GetPhy(appConnHandle.bdHandle);
             }
-
+            
             break;
         }
         /* This event indicates completion of the Cy_BLE_GetPhy API */
         case CY_BLE_EVT_GET_PHY_COMPLETE:
         {
-        	cy_stc_ble_events_param_generic_t * param = (cy_stc_ble_events_param_generic_t *) eventParam;
+            /* To remove unused parameter warning when UART debug is disabled */
+            #if (DEBUG_BLE == ENABLE)
+            cy_stc_ble_events_param_generic_t *param =\
+            cy_stc_ble_events_param_generic_t *)eventParam;
             cy_stc_ble_phy_param_t *phyparam = NULL;
-
+                      
             if(param->status == SUCCESS)
             {
                 phyparam = (cy_stc_ble_phy_param_t *)param->eventParams;
-                DEBUG_BLE("RxPhy Mask : 0x%02X\r\nTxPhy Mask : 0x%02X\r\n",phyparam->rxPhyMask, phyparam->txPhyMask);
+                DEBUG_BLE("RxPhy Mask : 0x%02X\r\nTxPhy Mask : 0x%02X\r\n", \
+                    phyparam->rxPhyMask, phyparam->txPhyMask);            
             }
-
+            #endif
+            
             break;
+
         }
         /* This event indicates that the controller has changed the transmitter
            PHY or receiver PHY in use */
         case CY_BLE_EVT_PHY_UPDATE_COMPLETE:
         {
             DEBUG_BLE("UPDATE PHY parameters\r\n");
-            cy_stc_ble_events_param_generic_t *param = (cy_stc_ble_events_param_generic_t *)eventParam;
+             /* To remove unused parameter warning when UART debug is disabled */
+            #if (DEBUG_BLE == ENABLE)
+            cy_stc_ble_events_param_generic_t *param =\
+           (cy_stc_ble_events_param_generic_t *)eventParam;
             cy_stc_ble_phy_param_t *phyparam = NULL;
             if(param->status == SUCCESS)
             {
                 phyparam = (cy_stc_ble_phy_param_t *)param->eventParams;
-                DEBUG_BLE("RxPhy Mask : 0x%02X\r\nTxPhy Mask : 0x%02X\r\n",phyparam->rxPhyMask, phyparam->txPhyMask);
+                DEBUG_BLE("RxPhy Mask : 0x%02X\r\nTxPhy Mask : 0x%02X\r\n",\
+                    phyparam->rxPhyMask, phyparam->txPhyMask);            
             }
-
+            #endif
+            
             break;
         }		
             
@@ -571,16 +749,18 @@ void StackEventHandler(uint32 event, void* eventParam)
         case CY_BLE_EVT_GATT_CONNECT_IND:
         {
             appConnHandle = *(cy_stc_ble_conn_handle_t *)eventParam;
-            DEBUG_BLE("CY_BLE_EVT_GATT_CONNECT_IND: %x, %x \r\n", appConnHandle.attId,appConnHandle.bdHandle);
-
+            DEBUG_BLE("CY_BLE_EVT_GATT_CONNECT_IND: %x, %x \r\n", 
+                        appConnHandle.attId, 
+                        appConnHandle.bdHandle);
+            
             /* Update Notification packet with the data. */
             notificationPacket.connHandle = appConnHandle;
-            notificationPacket.handleValPair.attrHandle = CUSTOM_UART_CHAR_HANDLE;
-            notificationPacket.handleValPair.value.val = uart_arr;
+            notificationPacket.handleValPair.attrHandle = CUSTOM_ACC_X_CHAR_HANDLE;
+            notificationPacket.handleValPair.value.val = accx_value;
             notificationPacket.handleValPair.value.len = NOTIFICATION_PKT_SIZE;
-
-            Cy_BLE_GetPhy(appConnHandle.bdHandle);
-
+            
+            Cy_BLE_GetPhy(appConnHandle.bdHandle);                   
+           
             break;
         }    
         /* This event is generated at the GAP Peripheral end after disconnection. */
@@ -604,31 +784,35 @@ void StackEventHandler(uint32 event, void* eventParam)
             negotiatedMtu = (((cy_stc_ble_gatt_xchg_mtu_param_t *)eventParam)->mtu < CY_BLE_GATT_MTU) ?
                             ((cy_stc_ble_gatt_xchg_mtu_param_t *)eventParam)->mtu : CY_BLE_GATT_MTU;
             DEBUG_BLE("CY_BLE_EVT_GATTS_XCNHG_MTU_REQ negotiated = %d\r\n", negotiatedMtu);
-
+            
             break;
         }   
         /* This event is triggered when there is a write request from the 
            Client device */
         case CY_BLE_EVT_GATTS_WRITE_REQ:
         {
+        	printf("StackEventHandler CY_BLE_EVT_GATTS_WRITE_REQ. Event : %ld \r\n", event);
+
             DEBUG_BLE("CY_BLE_EVT_GATTS_WRITE_REQ \r\n");  
             cy_stc_ble_gatt_write_param_t *write_req_param = \
             (cy_stc_ble_gatt_write_param_t *)eventParam;
             cy_stc_ble_gatts_db_attr_val_info_t attr_param;
                         
-            DEBUG_BLE("Received GATT Write Request [bdHandle %02X]\r\n",write_req_param->connHandle.bdHandle);
+            DEBUG_BLE("Received GATT Write Request [bdHandle %02X]\r\n",\
+                write_req_param->connHandle.bdHandle);
             attr_param.connHandle.bdHandle = write_req_param->connHandle.bdHandle;
             attr_param.connHandle.attId = write_req_param->connHandle.attId;
             attr_param.flags = CY_BLE_GATT_DB_PEER_INITIATED;
             attr_param.handleValuePair = write_req_param->handleValPair;
             attr_param.offset = 0;
             
-            DEBUG_BLE("write_req_param->handleValPair.attrHandle = %d",write_req_param->handleValPair.attrHandle);
-            DEBUG_BLE(" -> Should be = CUSTOM_SERV0_CHAR0_DESC0_HANDLE (%d)\r\n-> Should be = CUSTOM_SERV0_CHAR0_HANDLE(%d)\r\n",CUSTOM_UART_DECL_HANDLE, CUSTOM_UART_CHAR_HANDLE);
+            DEBUG_BLE("write_req_param->handleValPair.attrHandle = %d",\
+                write_req_param->handleValPair.attrHandle);
+            DEBUG_BLE(" -> Should be = CUSTOM_SERV0_CHAR0_DESC0_HANDLE (%d)\r\n-> Should be = CUSTOM_SERV0_CHAR0_HANDLE(%d)\r\n",CUSTOM_ACC_X_DECL_HANDLE, CUSTOM_ACC_X_CHAR_HANDLE);
+                  
            
-			if(write_req_param->handleValPair.attrHandle == (CUSTOM_UART_DECL_HANDLE))
+			if(write_req_param->handleValPair.attrHandle == (CUSTOM_ACC_X_DECL_HANDLE))
             {
-				Cy_BLE_GATTS_WriteAttributeValuePeer(&write_req_param->connHandle, &write_req_param->handleValPair);
                 if(Cy_BLE_GATTS_WriteRsp(write_req_param->connHandle) != CY_BLE_SUCCESS)
                 {
                     DEBUG_BLE("Failed to send write response \r\n");
@@ -639,17 +823,28 @@ void StackEventHandler(uint32 event, void* eventParam)
                     DEBUG_BLE("GATT write response sent \r\n");
                     app.notification_enabled = attr_param.handleValuePair.value.val[0];
                     DEBUG_BLE("app.notification_enabled = %d\r\n", app.notification_enabled);
+                    printf("Notification Enabled.\r\n\n");
                     notificationPacket.connHandle = appConnHandle;
-                    notificationPacket.handleValPair.attrHandle = CUSTOM_UART_CHAR_HANDLE;
-                    notificationPacket.handleValPair.value.val = uart_arr;
+                    notificationPacket.handleValPair.attrHandle = CUSTOM_ACC_X_CHAR_HANDLE;
+                    notificationPacket.handleValPair.value.val = accx_value;
                     notificationPacket.handleValPair.value.len = NOTIFICATION_PKT_SIZE;
                 }
+
+                printf("Allright \r\n");
             }
-			else if(write_req_param->handleValPair.attrHandle == (CUSTOM_UART_CHAR_HANDLE))
+			else if(write_req_param->handleValPair.attrHandle == (CUSTOM_ACC_X_CHAR_HANDLE))
 			{
+				// Remark: was on for test
+				printf("CUSTOM_ACC_X_CHAR_HANDLE \r\n");
+//				printf("len : %d \r\n", write_req_param->handleValPair.value.len);
+//				printf("value 0 : %d \r\n", write_req_param->handleValPair.value.val[0]);
+//				printf("value 1 : %d \r\n", write_req_param->handleValPair.value.val[1]);
+
+
 				if(Cy_BLE_GATTS_WriteRsp(write_req_param->connHandle) != CY_BLE_SUCCESS)
 				{
 					DEBUG_BLE("Failed to send write response \r\n");
+					printf("Error... \r\n");
 				}
 				else
 				{
@@ -674,7 +869,7 @@ void StackEventHandler(uint32 event, void* eventParam)
 			}
 			else
 			{
-				printf("Not correct is %d but should be %d \r\n", write_req_param->handleValPair.attrHandle, CUSTOM_UART_DECL_HANDLE);
+				printf("Not correct is %d but should be %d \r\n", write_req_param->handleValPair.attrHandle, CUSTOM_ACC_X_DECL_HANDLE);
 			}
             break;
         }
@@ -693,20 +888,43 @@ void StackEventHandler(uint32 event, void* eventParam)
     }
 }
 
-void SendNotification(uint16_t len, uint8_t* content)
+/*******************************************************************************
+* Function Name: SendNotification()
+********************************************************************************
+* Summary:
+* Sends notification data to the GATT Client
+*
+* Parameters:
+* None
+*
+* Return:
+* None
+*
+*******************************************************************************/
+void SendNotification(void)
 {
     cy_en_ble_api_result_t apiResult;
-
-    if(len > NOTIFICATION_PKT_SIZE)
+    apiResult = Cy_BLE_GATTS_Notification(&notificationPacket);
+    if(apiResult == CY_BLE_ERROR_INVALID_PARAMETER)
     {
-    	DEBUG_BLE("Couldn't send notification. Notification package is to large. \r\n");
+        DEBUG_BLE("Couldn't send notification. [CY_BLE_ERROR_INVALID_PARAMETER]\r\n");
     }
+    else if(apiResult != CY_BLE_SUCCESS)
+    {
+        DEBUG_BLE("Attrhandle = 0x%4X  Cy_BLE_GATTS_Notification API Error:"\
+            "0x%2.2x \r\n", notificationPacket.handleValPair.attrHandle, apiResult);
+    }
+}
 
+void SendAnswerNotification(uint16_t len, uint8_t* content)
+{
+    cy_en_ble_api_result_t apiResult;
     notificationPacket.handleValPair.value.len = len;
+
     for(uint16 i = 0; i < len; ++i)
-    {
     	notificationPacket.handleValPair.value.val[i] = content[i];
-    }
+
+    	//*(uint32_t*)notificationPacket.handleValPair.value.val = tosend;
 
     apiResult = Cy_BLE_GATTS_Notification(&notificationPacket);
     if(apiResult == CY_BLE_ERROR_INVALID_PARAMETER)
@@ -715,11 +933,9 @@ void SendNotification(uint16_t len, uint8_t* content)
     }
     else if(apiResult != CY_BLE_SUCCESS)
     {
-        DEBUG_BLE("Attrhandle = 0x%4X  Cy_BLE_GATTS_Notification API Error: 0x%2.2x \r\n", notificationPacket.handleValPair.attrHandle, apiResult);
+        DEBUG_BLE("Attrhandle = 0x%4X  Cy_BLE_GATTS_Notification API Error:"\
+            "0x%2.2x \r\n", notificationPacket.handleValPair.attrHandle, apiResult);
     }
-
-    DEBUG_BLE("Notification data sent: %d \r\n", len);
-
     // Set back
     notificationPacket.handleValPair.value.len = NOTIFICATION_PKT_SIZE;
 }

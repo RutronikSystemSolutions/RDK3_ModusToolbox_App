@@ -15,11 +15,10 @@
 #include "sgp40/sgp40.h"
 #include "scd41/scd41_app.h"
 #include "ams_tmf8828/tmf8828_app.h"
+#include "battery_monitor/battery_monitor.h"
+#include "dio59020/dio59020.h"
 
 #include "host_main.h"
-
-#include <stdio.h>
-
 
 static void init_sensors_hal(rutronik_application_t* app)
 {
@@ -28,6 +27,7 @@ static void init_sensors_hal(rutronik_application_t* app)
 	sgp40_init(hal_i2c_read, hal_i2c_write, hal_sleep);
 	scd41_app_init(&(app->scd41_app), hal_i2c_read, hal_i2c_write, hal_sleep);
 	tmf8828_app_init(hal_i2c_read, hal_i2c_write);
+	dio59020_init(hal_i2c_read_register, hal_i2c_write_register);
 }
 
 static int is_sensor_fusion_board_available()
@@ -95,7 +95,6 @@ static void init_co2_board(rutronik_application_t* app)
 	int retval = scd41_app_initialise_and_start_measurement(&app->scd41_app);
 	if (retval != 0)
 	{
-		printf("something went wrong with CO2 board: %d \r\n", retval);
 		app->co2_available = 0;
 		return;
 	}
@@ -119,7 +118,11 @@ void rutronik_application_init(rutronik_application_t* app)
 
 	app->prescaler = 0;
 
+	lowpassfilter_init(&app->filtered_voltage, 0.01);
+
 	init_sensors_hal(app);
+
+	battery_monitor_init();
 
 	if (is_sensor_fusion_board_available() != 0)
 	{
@@ -171,34 +174,66 @@ void rutronik_application_do(rutronik_application_t* app)
 		{
 			float temperature = 0;
 			float humidity = 0;
-			float pressure = 0;
+
+			if (sht4x_get_temperature_and_humidity(&temperature, &humidity) == 0)
+				host_main_add_notification(notification_fabric_create_for_sht4x(temperature, humidity));
+		}
+
+		app->prescaler = 5;
+	}
+	else if (app->prescaler == 1)
+	{
+		if (app->sensor_fusion_available != 0)
+		{
+			float temperature = 0;
+			float humidity = 0;
 			uint16_t voc_value_raw = 0;
 			uint16_t voc_value_compensated = 0;
 			int32_t gas_index = 0;
 
-			if (sht4x_get_temperature_and_humidity(&temperature, &humidity) == 0)
-				host_main_add_notification(notification_fabric_create_for_sht4x(temperature, humidity));
-
 			if (measure_sgp40_values(app, temperature, humidity, &voc_value_raw, &voc_value_compensated, &gas_index) == 0)
 				host_main_add_notification(notification_fabric_create_for_sgp40(voc_value_raw, voc_value_compensated, (uint16_t) gas_index));
-
-			if (bmp581_read_pressure_and_temperature(&pressure, &temperature) == 0)
-				host_main_add_notification(notification_fabric_create_for_bmp581(pressure, temperature));
 		}
+	}
+	else if (app->prescaler == 2)
+	{
+		float temperature = 0;
+		float pressure = 0;
 
+		if (bmp581_read_pressure_and_temperature(&pressure, &temperature) == 0)
+			host_main_add_notification(notification_fabric_create_for_bmp581(pressure, temperature));
+	}
+	else if (app->prescaler == 3)
+	{
 		if(app->co2_available != 0)
 		{
 			if (scd41_app_do(&app->scd41_app) == 0)
 				host_main_add_notification(
 						notification_fabric_create_for_scd41(app->scd41_app.value.co2_ppm, app->scd41_app.value.temperature, app->scd41_app.value.humidity));
 		}
-
-		app->prescaler = 5;
 	}
-	else
+	else if (app->prescaler == 4)
 	{
-		app->prescaler = app->prescaler - 1;
+		// Get the battery voltage
+		uint16_t battery_voltage = battery_monitor_get_voltage_mv();
+
+		charge_stat_t charge_stat;
+		dio_get_status(&charge_stat);
+
+		chrg_fault_t chrg_fault;
+		dio_get_fault(&chrg_fault);
+
+		uint8_t dio_status;
+		dio_monitor_read_raw(&dio_status);
+
+		lowpassfilter_feed(&app->filtered_voltage, battery_voltage);
+		battery_voltage = lowpassfilter_get_value(&app->filtered_voltage);
+
+		host_main_add_notification(
+				notification_fabric_create_for_battery_monitor(battery_voltage, (uint8_t) charge_stat, (uint8_t) chrg_fault, dio_status));
 	}
+
+	app->prescaler = app->prescaler - 1;
 
 	if(app->ams_tof_available != 0)
 	{

@@ -30,4 +30,6 @@ notification_t* notification_fabric_create_for_scd41(uint16_t co2_ppm, float tem
 
 notification_t* notification_fabric_create_for_tmf8828(tmf8828_results_t* results);
 
+notification_t* notification_fabric_create_for_battery_monitor(uint16_t voltage, uint8_t charge_status, uint8_t charge_fault, uint8_t dio_status);
+
 #endif /* NOTIFICATION_FABRIC_H_ */

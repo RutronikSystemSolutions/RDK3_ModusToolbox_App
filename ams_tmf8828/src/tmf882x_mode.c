@@ -55,7 +55,7 @@ static int32_t tmf882x_wait_for_cpu_ready(struct tmf882x_mode *self)
     while (retry++ < TMF882X_MAX_RETRY) {
         error = tof_get_register(to_priv(self), TMF882X_STAT, &status);
         if (error) {
-            tof_err(to_priv(self), "CPU status read failed, attempt %d: %d\r\n" , retry, error);
+            tof_err(to_priv(self), "CPU status read failed, attempt %ld: %ld\r\n" , retry, error);
             tmf882x_mode_standby_operation(self, TOF_WAKEUP);
             continue;
         }
@@ -89,10 +89,8 @@ static int32_t tmf882x_wait_for_cpu_ready(struct tmf882x_mode *self)
 static int32_t tmf882x_wait_for_cpu_startup(struct tmf882x_mode *self)
 {
     int32_t rc = 0;
-    printf("tmf882x_wait_for_cpu_startup \r\n");
     if (!self) return -1;
     tof_usleep(to_priv(self), TMF882X_STARTUP_WAIT_USEC);
-    printf("tmf882x_wait_for_cpu_startup 2 \r\n");
     rc = tmf882x_wait_for_cpu_ready(self);
     // wait again for patch application to override any settings
     tof_usleep(to_priv(self), TMF882X_STARTUP_WAIT_USEC);
@@ -186,15 +184,14 @@ static int32_t tmf882x_mode_open(struct tmf882x_mode *self)
         return error;
     }
 
-    printf("tmf882x_mode_open 2 \r\n");
     error = tof_i2c_read(to_priv(self), TMF882X_APP_ID,
                          self->info_rec.data,
                          sizeof(self->info_rec.record));
     if (error) {
-        tof_err(to_priv(self), "read record failed: %d", error);
+        tof_err(to_priv(self), "read record failed: %ld", error);
         return error;
     }
-    printf("tmf882x_mode_open 3 \r\n");
+
     tof_info(to_priv(self),
              "Read info record - Running mode: %#x.",
              tmf882x_mode(self));
@@ -220,7 +217,7 @@ void tmf882x_dump_data(struct tmf882x_mode *self, const uint8_t *dbuf, size_t le
 
     for (idx = 0; idx < len; idx += per_line) {
         cnt += snprintf((char *)buf, sizeof(buf) - cnt,
-                        "buffer dump [%02x]: ", idx);
+                        "buffer dump [%02lu]: ", idx);
         for (per_line_idx = 0;
              (per_line_idx < per_line) && ((idx + per_line_idx) < len);
              per_line_idx++) {
@@ -247,7 +244,7 @@ inline void tmf882x_mode_set_debug(struct tmf882x_mode *self, int32_t flag)
     self->debug = !!flag;
 }
 
-int32_t tmf882x_mode_version(struct tmf882x_mode *self, char *ver, size_t len)
+int32_t tmf882x_mode_version(struct tmf882x_mode *self, uint8_t *ver, size_t len)
 {
     if (!self || !ver) return -1;
 

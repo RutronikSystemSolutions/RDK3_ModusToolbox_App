@@ -1,16 +1,16 @@
 /******************************************************************************
 * File Name:   main.c
 *
-* Description: This is the source code for the RDK3 ModusToolbox Application to
-* be used with iOS and Android Rutronik Applications
-*
+* Description: This is the source code for the RDK3 Throughput Measurement
+*              Server Application for ModusToolbox.
 *
 * Related Document: See README.md
 *
 *
-*  Created on: 2023-04-25
+*  Created on: 2022-12-21
 *  Company: Rutronik Elektronische Bauelemente GmbH
-*  Author: GDR, ROJ030
+*  Address: Jonavos g. 30, Kaunas 44262, Lithuania
+*  Author: GDR
 *
 *******************************************************************************
 * (c) 2019-2021, Cypress Semiconductor Corporation. All rights reserved.
@@ -183,6 +183,7 @@ int main(void)
 //    }
 
 
+
     rutronik_application_init(&rutronik_app);
 
     Ble_Init(&rutronik_app);
@@ -200,9 +201,14 @@ int main(void)
 
     		rutronik_application_do(&rutronik_app);
 
-    		//host_main_add_notification(counter);
+    		if ((counter % 10) == 0)
+			{
+    			cyhal_gpio_toggle(LED1);
+			}
     		counter++;
     	}
+
+
 
     	host_main_do();
     }
