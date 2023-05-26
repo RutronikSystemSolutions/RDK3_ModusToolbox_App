@@ -40,6 +40,14 @@ void rutronik_application_init(rutronik_application_t* app);
  */
 uint32_t rutronik_application_get_available_sensors_mask(rutronik_application_t* app);
 
+
+/**
+ * @brief Change the mode of the TMF8828 sensor
+ *
+ * @param [in] mode TMF8828_MODE_3X3 (0) or TMF8828_MODE_8X8 (1)
+ */
+void rutronik_application_set_tmf8828_mode(rutronik_application_t* app, uint8_t mode);
+
 /**
  * @brief Perform cyclic operation
  */

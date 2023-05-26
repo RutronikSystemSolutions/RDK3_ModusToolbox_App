@@ -166,7 +166,8 @@ int host_main_do()
 	enum commands {
 		CMD_GET_AVAILABLE_SENSORS = 0,
 		CMD_START_PUSH_MODE = 1,
-		CMD_STOP_PUSH_MODE = 2
+		CMD_STOP_PUSH_MODE = 2,
+		CMD_ENABLED_DISABLE_TMF8828_8x8_MODE = 3
 	};
 
     // Cy_Ble_ProcessEvents() allows BLE stack to process pending events
@@ -202,6 +203,11 @@ int host_main_do()
 				app.mode = BLE_MODE_CONFIGURATION;
 				break;
 
+			case CMD_ENABLED_DISABLE_TMF8828_8x8_MODE:
+				printf("CMD_ENABLED_DISABLE_TMF8828_8x8_MODE param: %u \r\n", app.cmd.parameters[0]);
+				// Set 3x3 mode
+				rutronik_application_set_tmf8828_mode(app.rutronik_app, app.cmd.parameters[0]);
+				break;
     	}
 
     	app.cmd_to_process = 0;
@@ -857,6 +863,8 @@ void StackEventHandler(uint32 event, void* eventParam)
 
 						for(uint16_t i = 0; (i < len - 1) && (i < BLE_CMD_PARAM_MAX_SIZE); ++i)
 							app.cmd.parameters[i] = write_req_param->handleValPair.value.val[i + 1];
+
+						printf("len is: %u \r\n", len);
 
 						app.cmd_to_process = 1;
 					}

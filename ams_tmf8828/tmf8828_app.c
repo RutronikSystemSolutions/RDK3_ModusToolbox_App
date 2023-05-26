@@ -17,6 +17,14 @@
 
 #include <stdio.h>
 
+/**
+ * Following defines are needed to display the values of the sensor in case
+ * the 8x8 mode is selected
+ */
+#define NUM_MEAS_MSG_IN_8X8		  4
+#define NUM_ROWS_IN_8X8           8
+#define NUM_COLS_IN_8X8           8
+
 static const uint8_t TMF8828_I2C_ADDR = 0x41;
 
 static tmf8828_read_func_t i2c_read_bytes;
@@ -38,6 +46,12 @@ static struct tmf882x_mode_app_config tofcfg;
 
 static tmf8828_results_t last_results;
 static uint32_t last_sent_result;
+
+static struct tmf882x_msg_meas_results msgs[NUM_MEAS_MSG_IN_8X8] = {0};
+static uint16_t distances_mm[64] = { 0 };
+static uint32_t measurement_counter = 0;
+
+static uint8_t requested_new_mode = TMF8828_MODE_INVALID;
 
 void tmf8828_app_init(tmf8828_read_func_t read, tmf8828_write_func_t write)
 {
@@ -87,11 +101,30 @@ int tmf8828_app_is_board_available()
 	return 1;
 }
 
+uint16_t tmf8828_app_is_mode_8x8()
+{
+	if (tof_ctx.mode_8x8 != 0) return 1;
+	return 0;
+}
+
 static void power_on_tmf882x(void)
 {
     cyhal_gpio_write(ARDU_IO4, false);
     cyhal_system_delay_ms(1000); //Cold Start --> wait 1s
     cyhal_gpio_write(ARDU_IO4, true);
+}
+
+/**
+ * @brief Check if the mode (in parameter) is valid or not
+ *
+ * @retval 0 Not valid
+ * @retval 1 Valid
+ */
+static uint8_t is_mode_valid(uint8_t mode)
+{
+	if (mode == TMF8828_MODE_3X3) return 1;
+	if (mode == TMF8828_MODE_8X8) return 1;
+	return 0;
 }
 
 int tmf8828_app_init_measurement()
@@ -154,11 +187,10 @@ int tmf8828_app_init_measurement()
 
 	/**************************************************************************
 	*
-	* Disable 8x8 mode (if applicable) for tmf8828 devices
-	*  - IOCAPP_SET_8X8MODE is the ioctl command code used to set the 8x8 mode
+	* Enable or disable the 8x8 mode
 	*
 	*************************************************************************/
-	bool mode_8x8 = false;
+	bool mode_8x8 = true;
 	if(tmf882x_ioctl(&tof, IOCAPP_SET_8X8MODE, &mode_8x8, NULL) != 0) return -4;
 
 	/**************************************************************************
@@ -174,11 +206,14 @@ int tmf8828_app_init_measurement()
 	*
 	* Change the APP configuration
 	*  - set the reporting period to 100 milliseconds
-	*  - set the spad map configuration to 3x3 (33x32 degree FoV)
+	*  - set the spad map configuration to 3x3 (33x32 degree FoV) (in case not 8x8 mode)
 	*
 	*************************************************************************/
-	tofcfg.report_period_ms = 100;
-	tofcfg.spad_map_id = 1;
+	tofcfg.report_period_ms = 25;
+//#else
+//	tofcfg.report_period_ms = 100;
+//	tofcfg.spad_map_id = 1;
+//#endif
 
 	/**************************************************************************
 	*
@@ -214,14 +249,79 @@ int tmf8828_app_init_measurement()
 	return 0;
 }
 
+static void change_mode(uint8_t mode)
+{
+	bool is_measuring = false;
+
+	tmf882x_stop(&tof);
+	tmf882x_ioctl(&tof, IOCAPP_IS_MEAS, NULL, &is_measuring);
+
+	bool mode_8x8 = true;
+	if (mode == TMF8828_MODE_3X3) mode_8x8 = false;
+	if(tmf882x_ioctl(&tof, IOCAPP_SET_8X8MODE, &mode_8x8, NULL) != 0) return;
+
+
+	if(tmf882x_ioctl(&tof, IOCAPP_GET_CFG, NULL, &tofcfg) != 0) return;
+
+	if (mode == TMF8828_MODE_8X8)
+	{
+		tof_ctx.mode_8x8 = 1;
+		tofcfg.report_period_ms = 25;
+	}
+	else
+	{
+		tof_ctx.mode_8x8 = 0;
+		tofcfg.report_period_ms = 100;
+		tofcfg.spad_map_id = 1;
+	}
+
+	if(tmf882x_ioctl(&tof, IOCAPP_SET_CFG, &tofcfg, NULL) != 0) return;
+
+	if(tmf882x_ioctl(&tof, IOCAPP_SET_CALIB, &calibration_data, NULL) != 0) return;
+
+	(void) tmf882x_start(&tof);
+
+	(void) tmf882x_ioctl(&tof, IOCAPP_IS_MEAS, NULL, &is_measuring);
+}
+
+void tmf8828_app_request_new_mode(uint8_t mode)
+{
+	if (is_mode_valid(mode))
+	{
+		requested_new_mode = mode;
+	}
+	else
+	{
+		requested_new_mode = TMF8828_MODE_INVALID;
+	}
+}
+
 int tmf8828_app_do()
 {
 	tmf882x_process_irq(&tof);
 
-	if (last_sent_result != last_results.result_num)
+	if (is_mode_valid(requested_new_mode))
 	{
-		last_sent_result = last_results.result_num;
-		return 0;
+		printf("Do something with the new mode! %u \r\n", requested_new_mode);
+		change_mode(requested_new_mode);
+		requested_new_mode = TMF8828_MODE_INVALID;
+	}
+
+	if (tof_ctx.mode_8x8 != 0)
+	{
+		if (last_sent_result != measurement_counter)
+		{
+			last_sent_result = measurement_counter;
+			return 0;
+		}
+	}
+	else
+	{
+		if (last_sent_result != last_results.result_num)
+		{
+			last_sent_result = last_results.result_num;
+			return 0;
+		}
 	}
 
 	// Nothing available
@@ -233,24 +333,86 @@ tmf8828_results_t* tmpf8828_get_last_results()
 	return &last_results;
 }
 
-void tmpf8828_on_new_result(struct tmf882x_msg_meas_results *result_msg)
+uint16_t* tmpf8828_get_last_8x8_results()
 {
-	// Copy
-	last_results.result_num = result_msg->result_num;
-	last_results.temperature = result_msg->temperature;
-	last_results.ambient_light = result_msg->ambient_light;
-	last_results.photon_count = result_msg->photon_count;
-	last_results.ref_photon_count = result_msg->ref_photon_count;
-	last_results.sys_ticks = result_msg->sys_ticks;
-	last_results.valid_results = result_msg->valid_results;
-	last_results.num_results = result_msg->num_results;
-	for (uint32_t i = 0; i < result_msg->num_results; ++i)
+	return distances_mm;
+}
+
+void tmpf8828_on_new_result(struct platform_ctx *ctx, struct tmf882x_msg_meas_results *result_msg)
+{
+	if (!ctx || !result_msg) return;
+
+	if (ctx->mode_8x8 != 0)
 	{
-		last_results.results[i].confidence = result_msg->results[i].confidence;
-		last_results.results[i].distance_mm = result_msg->results[i].distance_mm;
-		last_results.results[i].channel = result_msg->results[i].channel;
-		last_results.results[i].ch_target_idx = result_msg->results[i].ch_target_idx;
-		last_results.results[i].sub_capture = result_msg->results[i].sub_capture;
+		uint32_t msg_idx = 0;
+		uint32_t row = 0, col = 0, ch = 0;
+
+		// which measurement in the 4x group is this?
+		msg_idx = result_msg->result_num % NUM_MEAS_MSG_IN_8X8;
+
+		// Buffer up 4 messages (for 64 zones)
+		memcpy(&msgs[msg_idx], result_msg, sizeof(*msgs));
+
+		if (msg_idx != (NUM_MEAS_MSG_IN_8X8 - 1))
+			return;	// wait until we have all measurement messages in an 8x8 group before logging
+
+		/**
+		 * Reset the distances
+		 * This is needed since some channels might have no reflection and in that case will be 0 because they were not updated
+		 */
+		for (uint16_t i = 0; i < 64; ++i) distances_mm[i] = 0;
+
+		// Map 4 measurement messages to one combined 64 pixel depth map
+		for (uint32_t idx = 0; idx < NUM_MEAS_MSG_IN_8X8; ++idx) {
+			for (uint32_t res = 0; res < msgs[idx].num_results; ++res) {
+
+				// Result Number, SubCapture, Channel indicate 1:64 zone mapping
+				ch = msgs[idx].results[res].channel;
+				row = col = 0;
+
+				row += (1 - (ch - 1) / 4) * 4;
+				row += (1 - (((ch - 1) % 4) / 2)) * 2;
+				row += (1 - idx/2);
+
+				col += (1 - (ch % 2)) * 4;
+				col += (idx % 2) * 2;
+				col += msgs[idx].results[res].sub_capture;
+
+				distances_mm[row * NUM_COLS_IN_8X8 + col] = (uint16_t) msgs[idx].results[res].distance_mm;
+			}
+		}
+
+		measurement_counter = measurement_counter + 1;
+
+//		// Print 8x8 distance results (1st object only)
+//		for (uint32_t idx = 0; idx < sizeof(distances_mm)/sizeof(*distances_mm); ++idx) {
+//			printf("%4.0u", distances_mm[idx] / 10);
+//			if (((idx+1) % 8) == 0) { // print in 8x8 grid
+//				printf("\r\n");
+//			}
+//		}
+//
+//		printf("\r\n\r\n");
+	}
+	else
+	{
+		// Copy
+		last_results.result_num = result_msg->result_num;
+		last_results.temperature = result_msg->temperature;
+		last_results.ambient_light = result_msg->ambient_light;
+		last_results.photon_count = result_msg->photon_count;
+		last_results.ref_photon_count = result_msg->ref_photon_count;
+		last_results.sys_ticks = result_msg->sys_ticks;
+		last_results.valid_results = result_msg->valid_results;
+		last_results.num_results = result_msg->num_results;
+		for (uint32_t i = 0; i < result_msg->num_results; ++i)
+		{
+			last_results.results[i].confidence = result_msg->results[i].confidence;
+			last_results.results[i].distance_mm = result_msg->results[i].distance_mm;
+			last_results.results[i].channel = result_msg->results[i].channel;
+			last_results.results[i].ch_target_idx = result_msg->results[i].ch_target_idx;
+			last_results.results[i].sub_capture = result_msg->results[i].sub_capture;
+		}
 	}
 
 //	printf("tmpf8828_on_new_result\r\n");

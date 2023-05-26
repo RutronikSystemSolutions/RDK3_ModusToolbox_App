@@ -34,9 +34,9 @@
                                         <Field>
                                             <FieldProperties>
                                                 <Property id="Name" value="Name"/>
-                                                <Property id="Value" value="RDK3"/>
+                                                <Property id="Value" value="RDK3_TX"/>
                                                 <Property id="Format" value="f_utf8s"/>
-                                                <Property id="ByteLength" value="4"/>
+                                                <Property id="ByteLength" value="7"/>
                                             </FieldProperties>
                                         </Field>
                                     </Fields>
@@ -58,7 +58,7 @@
                                         <Property id="AuthenticationPermissionRead" value="NoAuthenticationRequired"/>
                                         <Property id="AuthorizationPermissionRead" value="NoAuthorizationRequired"/>
                                         <Property id="AccessPermissionWrite" value="false"/>
-                                        <Property id="EncryptionPermissionWrite" value="NoEncryptionRequired"/>
+                                        <Property id="EncryptionPermissionWrite" value="EncryptionRequired"/>
                                         <Property id="AuthenticationPermissionWrite" value="NoAuthenticationRequired"/>
                                         <Property id="AuthorizationPermissionWrite" value="NoAuthorizationRequired"/>
                                     </Permission>
@@ -87,7 +87,7 @@
                                         <Property id="AuthenticationPermissionRead" value="NoAuthenticationRequired"/>
                                         <Property id="AuthorizationPermissionRead" value="NoAuthorizationRequired"/>
                                         <Property id="AccessPermissionWrite" value="false"/>
-                                        <Property id="EncryptionPermissionWrite" value="NoEncryptionRequired"/>
+                                        <Property id="EncryptionPermissionWrite" value="EncryptionRequired"/>
                                         <Property id="AuthenticationPermissionWrite" value="NoAuthenticationRequired"/>
                                         <Property id="AuthorizationPermissionWrite" value="NoAuthorizationRequired"/>
                                     </Permission>
@@ -102,9 +102,16 @@
                             </ServiceProperties>
                             <Characteristics/>
                         </Service>
+                        <Service type="org.bluetooth.service.device_information">
+                            <ServiceProperties>
+                                <Property id="EntityID" value="{32cf247e-c8b3-4b97-95e6-a09137868b2b}"/>
+                                <Property id="ServiceDeclaration" value="Primary"/>
+                            </ServiceProperties>
+                            <Characteristics/>
+                        </Service>
                         <Service type="org.bluetooth.service.custom">
                             <ServiceProperties>
-                                <Property id="DisplayName" value="BLE_MTB_APP"/>
+                                <Property id="DisplayName" value="BLE Throughput"/>
                                 <Property id="EntityID" value="{aa2115c0-ae69-482b-8f7e-87192df73085}"/>
                                 <Property id="UUID" value="76B6758B-FEDC-45F0-A5A4-4F49559BD71D"/>
                                 <Property id="ServiceDeclaration" value="Primary"/>
@@ -231,14 +238,14 @@
     </Profiles>
     <GAP>
         <General>
-            <Property id="DeviceAddress" value="00A050-XXXXXX"/>
-            <Property id="SiliconGeneratedAddress" value="true"/>
+            <Property id="DeviceAddress" value="00A050-AABBFF"/>
+            <Property id="SiliconGeneratedAddress" value="false"/>
             <Property id="MacGeneratedAddress" value="false"/>
-            <Property id="DeviceName" value="RDK3"/>
+            <Property id="DeviceName" value="RDK3_TX"/>
             <Property id="Appearance" value="0"/>
             <Property id="TxPowerLevelAdvScan" value="Pos_4"/>
             <Property id="TxPowerLevelConnection" value="Pos_4"/>
-            <Property id="BondListSize" value="4"/>
+            <Property id="BondListSize" value="16"/>
         </General>
         <PeripheralConfigurations>
             <PeripheralConfiguration name="Peripheral configuration 0">
@@ -257,14 +264,14 @@
                     <Property id="AdLocalName" value="true"/>
                     <Property id="LocalNameType" value="Complete"/>
                     <Property id="AdServiceUuid" value="true"/>
-                    <Property id="ServiceUuid" value=""/>
+                    <Property id="ServiceUuid" value="{32cf247e-c8b3-4b97-95e6-a09137868b2b}"/>
                 </AdvertisementPacket>
             </PeripheralConfiguration>
         </PeripheralConfigurations>
         <SecurityConfigurations>
             <SecurityProperties>
                 <Property id="SecurityMode" value="SecurityMode_1"/>
-                <Property id="SecurityLevel" value="NoSecurity"/>
+                <Property id="SecurityLevel" value="Unauthenticated"/>
                 <Property id="IoCapability" value="NoInputNoOutput"/>
                 <Property id="Bonding" value="Bond"/>
                 <Property id="EncryptionKeySize" value="16"/>

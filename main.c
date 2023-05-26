@@ -150,7 +150,7 @@ int main(void)
     result |= cyhal_gpio_init(LED3, CYHAL_GPIO_DIR_OUTPUT, CYHAL_GPIO_DRIVE_STRONG, CYBSP_LED_STATE_OFF);
     if (result != CY_RSLT_SUCCESS)
     {CY_ASSERT(0);}
-    cyhal_gpio_write((cyhal_gpio_t)LED1, CYBSP_LED_STATE_OFF);
+    cyhal_gpio_write((cyhal_gpio_t)LED1, CYBSP_LED_STATE_ON);
     cyhal_gpio_write((cyhal_gpio_t)LED2, CYBSP_LED_STATE_OFF);
     cyhal_gpio_write((cyhal_gpio_t)LED3, CYBSP_LED_STATE_OFF);
 

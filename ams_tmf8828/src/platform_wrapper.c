@@ -260,7 +260,7 @@ int32_t platform_wrapper_handle_msg(struct platform_ctx *ctx,
     if (msg->hdr.msg_id == ID_MEAS_RESULTS) {
         ctx->curr_num_measurements++;
         //print_result(ctx, &msg->meas_result_msg);
-        tmpf8828_on_new_result(&msg->meas_result_msg);
+        tmpf8828_on_new_result(ctx, &msg->meas_result_msg);
     }
     return 0;
 }

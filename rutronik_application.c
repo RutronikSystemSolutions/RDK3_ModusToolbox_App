@@ -151,6 +151,11 @@ uint32_t rutronik_application_get_available_sensors_mask(rutronik_application_t*
 			| ((uint32_t) app->ams_tof_available) << 2;
 }
 
+void rutronik_application_set_tmf8828_mode(rutronik_application_t* app, uint8_t mode)
+{
+	tmf8828_app_request_new_mode(mode);
+}
+
 static int measure_sgp40_values(rutronik_application_t* app, float temperature, float humidity, uint16_t * voc_value_raw, uint16_t * voc_value_compensated, int32_t * gas_index)
 {
 	if (sgp40_measure_raw_signal_without_compensation(voc_value_raw) != 0) return -1;
@@ -235,12 +240,24 @@ void rutronik_application_do(rutronik_application_t* app)
 
 	app->prescaler = app->prescaler - 1;
 
+	/**
+	 * In order to achieve high number of values per seconds
+	 * the values of the TMF8828 are continuously pushed
+	 */
 	if(app->ams_tof_available != 0)
 	{
 		if (tmf8828_app_do() == 0)
 		{
-			host_main_add_notification(
-					notification_fabric_create_for_tmf8828(tmpf8828_get_last_results()));
+			if (tmf8828_app_is_mode_8x8())
+			{
+				host_main_add_notification(
+						notification_fabric_create_for_tmf8828_8x8_mode(tmpf8828_get_last_8x8_results()));
+			}
+			else
+			{
+				host_main_add_notification(
+						notification_fabric_create_for_tmf8828(tmpf8828_get_last_results()));
+			}
 		}
 	}
 }

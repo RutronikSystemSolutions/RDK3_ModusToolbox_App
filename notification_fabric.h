@@ -32,4 +32,6 @@ notification_t* notification_fabric_create_for_tmf8828(tmf8828_results_t* result
 
 notification_t* notification_fabric_create_for_battery_monitor(uint16_t voltage, uint8_t charge_status, uint8_t charge_fault, uint8_t dio_status);
 
+notification_t* notification_fabric_create_for_tmf8828_8x8_mode(uint16_t* distances);
+
 #endif /* NOTIFICATION_FABRIC_H_ */

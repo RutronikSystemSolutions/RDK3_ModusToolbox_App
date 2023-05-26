@@ -24,7 +24,8 @@
 *****************************************************************************
 */
 
-#pragma once
+#ifndef AMS_TMF8828_PLATFORM_WRAPPER_H_
+#define AMS_TMF8828_PLATFORM_WRAPPER_H_
 
 #include "tmf882x.h"
 #include "tmf882x_mode_app_ioctl.h"
@@ -33,8 +34,6 @@
 #include "cybsp.h"
 #include "cy_retarget_io.h"
 #include "ams_rutdk2_i2c.h"
-
-
 
 struct platform_ctx {
     char *i2cdev;
@@ -57,3 +56,5 @@ extern void platform_wrapper_start_measurements(struct platform_ctx *ctx, uint32
 extern int32_t platform_wrapper_handle_msg(struct platform_ctx *ctx, struct tmf882x_msg *msg);
 extern int32_t platform_wrapper_write_i2c_block(struct platform_ctx *ctx, uint8_t reg, const uint8_t *buf, uint32_t len);
 extern int32_t platform_wrapper_read_i2c_block(struct platform_ctx *ctx, uint8_t reg, uint8_t *buf, uint32_t len);
+
+#endif /* AMS_TMF8828_PLATFORM_WRAPPER_H_ */
