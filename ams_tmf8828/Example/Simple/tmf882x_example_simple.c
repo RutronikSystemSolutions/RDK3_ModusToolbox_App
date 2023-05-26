@@ -107,34 +107,6 @@ static void power_on_tmf882x(void)
 }
 
 /*
- * When the demo is measuring light the board LED GREEN
- */
-static void update_board_led(bool measuring) {
-    if (measuring)
-       // LED_GREEN_ON();
-	cyhal_gpio_write(LED1, false);
-    else
-        //LED_GREEN_OFF();
-	cyhal_gpio_write(LED1, true);
-}
-
-/*
- * Simple debounce routine to check if the user hit the 'ISP' button
- * on the board.
- */
-//static bool user_pressed_measure_toggle_button(uint32_t *gpio_history) {
-//    // return debounced 0->1 transition of ISP switch
-//    if (!gpio_history)
-//        return false;
-//    uint32_t gpio_hist = *gpio_history;
-//    //gpio_hist = (gpio_hist << 1)| GPIO_PinRead(GPIO, BOARD_SW1_GPIO_PORT, BOARD_SW1_GPIO_PIN);
-//    gpio_hist = (gpio_hist << 1)| !cyhal_gpio_read(USER_BTN1);
-//    *gpio_history = gpio_hist;
-//    return ((gpio_hist & ((1 << SW_DEBOUNCE_CNT) - 1))
-//            == ((1 << (SW_DEBOUNCE_CNT - 1)) - 1));
-//}
-
-/*
  * Log measure results to the UART as they come from the device.
  * See "tmf882x.h" for sensor output data type definitions.
  */

@@ -105,5 +105,5 @@ DEVICE_CYB06447BZI-BLD53_DIE:=PSoC6ABLE2
 DEVICE_CYB06447BZI-BLD53_FEATURES:=SecureBoot
 DEVICE_CYB06447BZI-BLD53_FLASH_KB:=832
 DEVICE_LIST:=CYB06447BZI-BLD53
-DEVICE_TOOL_IDS:=bsp-assistant bt-configurator capsense-configurator capsense-tuner device-configurator dfuh-tool fw-loader library-manager lin-configurator ml-configurator project-creator qspi-configurator secure-policy-configurator seglcd-configurator smartio-configurator
+DEVICE_TOOL_IDS:=bsp-assistant bt-configurator capsense-configurator capsense-tuner device-configurator dfuh-tool library-manager lin-configurator ml-configurator project-creator qspi-configurator secure-policy-configurator seglcd-configurator smartio-configurator
 RECIPE_DIR:=$(SEARCH_recipe-make-cat1a)

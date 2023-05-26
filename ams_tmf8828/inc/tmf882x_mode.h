@@ -317,7 +317,7 @@ extern void tmf882x_mode_set_debug(struct tmf882x_mode *self, int32_t flag);
  * @return
  *      number of characters copied to buffer
  */
-extern int32_t tmf882x_mode_version(struct tmf882x_mode *self, char *ver, size_t len);
+extern int32_t tmf882x_mode_version(struct tmf882x_mode *self, uint8_t *ver, size_t len);
 
 #if (!CONFIG_TMF882X_DATA_DUMP_SUPPORT())
 #define tmf882x_dump_data(...)

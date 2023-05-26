@@ -159,3 +159,63 @@ notification_t* notification_fabric_create_for_tmf8828(tmf8828_results_t* result
 
 	return retval;
 }
+
+notification_t* notification_fabric_create_for_battery_monitor(uint16_t voltage, uint8_t charge_status, uint8_t charge_fault, uint8_t dio_status)
+{
+	const uint8_t data_size = 5;
+	const uint8_t notification_size = data_size + notification_overhead;
+	const uint16_t sensor_id = 0x6;
+
+	uint8_t* data = (uint8_t*) malloc(notification_size);
+
+	data[0] = (uint8_t) (sensor_id & 0xFF);
+	data[1] = (uint8_t) (sensor_id >> 8);
+
+	data[2] = data_size;
+
+	*((uint16_t*) &data[3]) = voltage;
+
+	data[5] = charge_status;
+	data[6] = charge_fault;
+	data[7] = dio_status;
+
+	data[8] = compute_crc(data, notification_size - 1);
+
+	notification_t* retval = (notification_t*) malloc(sizeof(notification_t));
+	retval->length = notification_size;
+	retval->data = data;
+
+	return retval;
+}
+
+notification_t* notification_fabric_create_for_tmf8828_8x8_mode(uint16_t* distances)
+{
+	const uint8_t data_size = 128; // 64*uint16_t (distance)
+	const uint8_t notification_size = data_size + notification_overhead;
+	const uint16_t sensor_id = 0x7;
+	const uint16_t values_count = 64;
+	uint16_t index = 0;
+
+	uint8_t* data = (uint8_t*) malloc(notification_size);
+
+	data[0] = (uint8_t) (sensor_id & 0xFF);
+	data[1] = (uint8_t) (sensor_id >> 8);
+
+	data[2] = data_size;
+
+	index = 3;
+
+	for(uint16_t i = 0; i < values_count; ++i)
+	{
+		*((uint16_t*) &data[index]) = distances[i];
+		index += sizeof(uint16_t);
+	}
+
+	data[index] = compute_crc(data, notification_size - 1);
+
+	notification_t* retval = (notification_t*) malloc(sizeof(notification_t));
+	retval->length = notification_size;
+	retval->data = data;
+
+	return retval;
+}

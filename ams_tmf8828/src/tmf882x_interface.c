@@ -79,23 +79,16 @@ int32_t tmf882x_open(struct tmf882x_tof * tof)
     tmf882x_mode_t mode;
     if (!tof) return -1;
 
-    printf("tmf882x_open 1 \r\n");
-
     if (!tof->state.ops->tag) {
         // if closed, open base mode first
         if (tof->state.ops->open &&
                 tof->state.ops->open(&tof->state)) {
             tof_err(to_priv(&tof->state), "Error opening device");
             tmf882x_init(tof, to_priv(&tof->state));
-            printf("2 \r\n");
             return -1;
         }
 
-        printf("3 \r\n");
-
         mode = tmf882x_get_mode(tof);
-
-        printf("4 \r\n");
 
         // Try to initialize mode context with requested mode and open()
         initialize_state_from_mode(tof, mode);
@@ -103,16 +96,11 @@ int32_t tmf882x_open(struct tmf882x_tof * tof)
 
     if (tof->state.ops->open &&
         tof->state.ops->open(&tof->state)) {
-    	printf("5 \r\n");
         tof_err(to_priv(&tof->state), "Error opening mode: %#x",
                 mode);
-        printf("6 \r\n");
         tmf882x_init(tof, to_priv(&tof->state));
-        printf("7 \r\n");
         return -1;
     }
-
-    printf("8 \r\n");
 
     return 0;
 }
@@ -208,7 +196,7 @@ int32_t tmf882x_ioctl(struct tmf882x_tof *tof, uint32_t cmd, const void *input, 
     if (tof && tof->state.ops->ioctl)
 	{
 	if (tof->state.debug)
-	    tof_info(to_priv(&tof->state), "%s: dir: 0x%x mode: 0x%x isize: 0x%x osize: 0x%x cmd: 0x%x", __func__, _IOCTL_DIR(cmd), _IOCTL_MODE(cmd), _IOCTL_ISIZE(cmd),
+	    tof_info(to_priv(&tof->state), "%s: dir: 0x%lu mode: 0x%lu isize: 0x%lu osize: 0x%lu cmd: 0x%lu", __func__, _IOCTL_DIR(cmd), _IOCTL_MODE(cmd), _IOCTL_ISIZE(cmd),
 		    _IOCTL_OSIZE(cmd), _IOCTL_NR(cmd));
 	rc = tof->state.ops->ioctl(&tof->state, cmd, input, output);
 

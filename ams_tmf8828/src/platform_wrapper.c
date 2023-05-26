@@ -42,38 +42,6 @@
 #define TMF882X_DEFAULT_ITERATIONS    550
 #define TMF882X_DEFAULT_REP_PERIOD_MS 30
 
-static void print_result(struct platform_ctx *ctx, struct tmf882x_msg_meas_results *result_msg)
-{
-    if (!ctx || !result_msg)
-    {
-    	return;
-    }
-
-//    printf("\x1b[2J\x1b[;H");
-//    printf("\n\r");
-//    printf("    TMF8820 3x3 multi-zone Time-of-Flight Sensor\n\r");
-    printf("measurement_num: %u num_results: %u valid results: %u \r\n",
-    		(unsigned int)result_msg->result_num,
-			(unsigned int)result_msg->num_results,
-			(unsigned int)result_msg->valid_results);
-
-    for (uint32_t i = 0; i < result_msg->num_results; ++i)
-    {
-        printf("conf: %u distance_mm: %u channel: %u sub_capture: %u\r\n",
-        		(unsigned int)result_msg->results[i].confidence,
-				(unsigned int)result_msg->results[i].distance_mm,
-				(unsigned int)result_msg->results[i].channel,
-				(unsigned int)result_msg->results[i].sub_capture);
-    }
-
-    printf("photon: %u ref_photon: %u ALS: %u\r\n",
-    		(unsigned int)result_msg->photon_count,
-			(unsigned int)result_msg->ref_photon_count,
-			(unsigned int)result_msg->ambient_light);
-
-    return;
-}
-
 int32_t platform_wrapper_power_on(struct platform_ctx *ctx)
 {
     cyhal_gpio_write(ARDU_IO4, true);
@@ -114,7 +82,7 @@ int32_t platform_wrapper_init_device(struct platform_ctx *ctx,
 
         rc = tmf882x_fwdl(ctx->tof, FWDL_TYPE_HEX, hex_records, hex_size);
         if (rc) {
-            fprintf(stderr, "Error (%d) performing FWDL with hex records\n",rc);
+            fprintf(stderr, "Error (%d) performing FWDL with hex records\n",(int)rc);
             return rc;
         }
 
@@ -275,7 +243,7 @@ void platform_wrapper_start_measurements(struct platform_ctx *ctx,
         usleep(5000); // poll period
         if (num_measurements &&
             ctx->curr_num_measurements == num_measurements) {
-            printf("Read %u results\n", num_measurements);
+            printf("Read %lu results\n", num_measurements);
             break;
         }
     }
@@ -292,7 +260,7 @@ int32_t platform_wrapper_handle_msg(struct platform_ctx *ctx,
     if (msg->hdr.msg_id == ID_MEAS_RESULTS) {
         ctx->curr_num_measurements++;
         //print_result(ctx, &msg->meas_result_msg);
-        tmpf8828_on_new_result(&msg->meas_result_msg);
+        tmpf8828_on_new_result(ctx, &msg->meas_result_msg);
     }
     return 0;
 }
