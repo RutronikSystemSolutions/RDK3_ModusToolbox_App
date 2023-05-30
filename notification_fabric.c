@@ -219,3 +219,27 @@ notification_t* notification_fabric_create_for_tmf8828_8x8_mode(uint16_t* distan
 
 	return retval;
 }
+
+notification_t* notification_fabric_create_for_pasco2(uint16_t co2_ppm)
+{
+	const uint8_t data_size = 2;
+	const uint8_t notification_size = data_size + notification_overhead;
+	const uint16_t sensor_id = 0x8;
+
+	uint8_t* data = (uint8_t*) malloc(notification_size);
+
+	data[0] = (uint8_t) (sensor_id & 0xFF);
+	data[1] = (uint8_t) (sensor_id >> 8);
+
+	data[2] = data_size;
+
+	*((uint16_t*) &data[3]) = co2_ppm;
+
+	data[5] = compute_crc(data, notification_size - 1);
+
+	notification_t* retval = (notification_t*) malloc(sizeof(notification_t));
+	retval->length = notification_size;
+	retval->data = data;
+
+	return retval;
+}

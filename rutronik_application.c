@@ -13,12 +13,12 @@
 #include "sht4x/sht4x.h"
 #include "bmp581/bmp581.h"
 #include "sgp40/sgp40.h"
-#include "scd41/scd41_app.h"
 #include "ams_tmf8828/tmf8828_app.h"
 #include "battery_monitor/battery_monitor.h"
 #include "dio59020/dio59020.h"
 
 #include "host_main.h"
+
 
 static void init_sensors_hal(rutronik_application_t* app)
 {
@@ -28,6 +28,7 @@ static void init_sensors_hal(rutronik_application_t* app)
 	scd41_app_init(&(app->scd41_app), hal_i2c_read, hal_i2c_write, hal_sleep);
 	tmf8828_app_init(hal_i2c_read, hal_i2c_write);
 	dio59020_init(hal_i2c_read_register, hal_i2c_write_register);
+	pasco2_app_init(hal_i2c_read, hal_i2c_write, hal_sleep);
 }
 
 static int is_sensor_fusion_board_available()
@@ -98,6 +99,13 @@ static void init_co2_board(rutronik_application_t* app)
 		app->co2_available = 0;
 		return;
 	}
+
+	retval = pasco2_app_start_measurement(&app->pasco2_app);
+	if (retval != 0)
+	{
+		app->co2_available = 0;
+		return;
+	}
 }
 
 static void init_ams_osram_board(rutronik_application_t* app)
@@ -153,6 +161,8 @@ uint32_t rutronik_application_get_available_sensors_mask(rutronik_application_t*
 
 void rutronik_application_set_tmf8828_mode(rutronik_application_t* app, uint8_t mode)
 {
+	if (app->ams_tof_available == 0) return;
+
 	tmf8828_app_request_new_mode(mode);
 }
 
@@ -184,7 +194,7 @@ void rutronik_application_do(rutronik_application_t* app)
 				host_main_add_notification(notification_fabric_create_for_sht4x(temperature, humidity));
 		}
 
-		app->prescaler = 5;
+		app->prescaler = 6;
 	}
 	else if (app->prescaler == 1)
 	{
@@ -236,6 +246,15 @@ void rutronik_application_do(rutronik_application_t* app)
 
 		host_main_add_notification(
 				notification_fabric_create_for_battery_monitor(battery_voltage, (uint8_t) charge_stat, (uint8_t) chrg_fault, dio_status));
+	}
+	else if (app->prescaler == 5)
+	{
+		if(app->co2_available != 0)
+		{
+			if (pasco2_app_do(&app->pasco2_app) == 0)
+				host_main_add_notification(
+						notification_fabric_create_for_pasco2(app->pasco2_app.co2_ppm));
+		}
 	}
 
 	app->prescaler = app->prescaler - 1;

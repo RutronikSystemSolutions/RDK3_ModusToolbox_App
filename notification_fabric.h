@@ -34,4 +34,6 @@ notification_t* notification_fabric_create_for_battery_monitor(uint16_t voltage,
 
 notification_t* notification_fabric_create_for_tmf8828_8x8_mode(uint16_t* distances);
 
+notification_t* notification_fabric_create_for_pasco2(uint16_t co2_ppm);
+
 #endif /* NOTIFICATION_FABRIC_H_ */

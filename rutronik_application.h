@@ -13,6 +13,7 @@
 #include "sgp40/sensirion_gas_index_algorithm.h"
 #include "scd41/scd41_app.h"
 #include "filter/lowpassfilter.h"
+#include "pasco2/pasco2_app.h"
 
 typedef struct
 {
@@ -22,6 +23,7 @@ typedef struct
 
 	GasIndexAlgorithmParams gas_index_params;
 	scd41_app_t scd41_app;
+	pasco2_app_t pasco2_app;
 
 	uint16_t prescaler;
 
