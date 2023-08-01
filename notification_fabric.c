@@ -243,3 +243,28 @@ notification_t* notification_fabric_create_for_pasco2(uint16_t co2_ppm)
 
 	return retval;
 }
+
+notification_t* notification_fabric_create_for_dps310(float pressure, float temperature)
+{
+	const uint8_t data_size = 8;
+	const uint8_t notification_size = data_size + notification_overhead;
+	const uint16_t sensor_id = 0xA;
+
+	uint8_t* data = (uint8_t*) malloc(notification_size);
+
+	data[0] = (uint8_t) (sensor_id & 0xFF);
+	data[1] = (uint8_t) (sensor_id >> 8);
+
+	data[2] = data_size;
+
+	*((float*) &data[3]) = pressure;
+	*((float*) &data[7]) = temperature;
+
+	data[11] = compute_crc(data, notification_size - 1);
+
+	notification_t* retval = (notification_t*) malloc(sizeof(notification_t));
+	retval->length = notification_size;
+	retval->data = data;
+
+	return retval;
+}

@@ -16,6 +16,7 @@
 #include "ams_tmf8828/tmf8828_app.h"
 #include "battery_monitor/battery_monitor.h"
 #include "dio59020/dio59020.h"
+#include "dps310/dps310_app.h"
 
 #include "host_main.h"
 
@@ -29,6 +30,7 @@ static void init_sensors_hal(rutronik_application_t* app)
 	tmf8828_app_init(hal_i2c_read, hal_i2c_write);
 	dio59020_init(hal_i2c_read_register, hal_i2c_write_register);
 	pasco2_app_init(hal_i2c_read, hal_i2c_write, hal_sleep);
+	dps310_app_init_i2c_interface(hal_i2c_read, hal_i2c_write);
 }
 
 static int is_sensor_fusion_board_available()
@@ -89,6 +91,8 @@ static void init_sensor_fusion(rutronik_application_t* app)
 		app->sensor_fusion_available = 0;
 		return;
 	}
+
+	dps310_app_init();
 }
 
 static void init_co2_board(rutronik_application_t* app)
@@ -194,7 +198,7 @@ void rutronik_application_do(rutronik_application_t* app)
 				host_main_add_notification(notification_fabric_create_for_sht4x(temperature, humidity));
 		}
 
-		app->prescaler = 6;
+		app->prescaler = 7;
 	}
 	else if (app->prescaler == 1)
 	{
@@ -254,6 +258,19 @@ void rutronik_application_do(rutronik_application_t* app)
 			if (pasco2_app_do(&app->pasco2_app) == 0)
 				host_main_add_notification(
 						notification_fabric_create_for_pasco2(app->pasco2_app.co2_ppm));
+		}
+	}
+	else if (app->prescaler == 6)
+	{
+		if (app->sensor_fusion_available)
+		{
+			if (dps310_app_do() == 0)
+			{
+				float pressure = 0;
+				float temperature = 0;
+				dps310_app_get_last_values(&temperature, &pressure);
+				host_main_add_notification(notification_fabric_create_for_dps310(pressure, temperature));
+			}
 		}
 	}
 
