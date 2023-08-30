@@ -104,16 +104,13 @@ INCLUDES=
 # Possible defines: 
 # AMS_TMF_SUPPORT => To enable the support of the time of flight board
 # BME688_SUPPORT => To enable the support of the BME688 sensor 
-DEFINES=AMS_TMF_SUPPORT
+DEFINES=AMS_TMF_SUPPORT BME688_SUPPORT
 
 # Select softfp or hardfp floating point. Default is softfp.
 VFP_SELECT=
 
-# Additional / custom C compiler flags.
-#
-# NOTE: Includes and defines should use the INCLUDES and DEFINES variable
-# above.
-CFLAGS=-O0
+# Set optimisation to size (if not, cannot have AMS and BME688 at the same time)
+CFLAGS=-Os
 
 # Additional / custom C++ compiler flags.
 #
