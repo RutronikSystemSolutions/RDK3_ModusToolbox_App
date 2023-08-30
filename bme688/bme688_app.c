@@ -140,6 +140,7 @@ int bme688_app_do(bme688_app_t* app)
 		if (bme688_read_data_field(i, &data) != 0) return -1;
 
 		if (data.new_data == 0) continue;
+		if (data.gas_valid_r == 0) continue;
 
 		if (data.gas_meas_index > BME688_MAX_STEPS_NB) return -2;
 		if (data.gas_meas_index > app->measurement_configuration.heater_step_nb) return -3;
