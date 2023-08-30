@@ -12,4 +12,6 @@
 
 void hal_sleep(uint32_t ms);
 
+void hal_sleep_us(uint16_t us);
+
 #endif /* HAL_HAL_SLEEP_H_ */

@@ -65,7 +65,7 @@ TOOLCHAIN=GCC_ARM
 #
 # If CONFIG is manually edited, ensure to update or regenerate launch configurations
 # for your IDE.
-CONFIG=Costum
+CONFIG=Custom
 
 # If set to "true" or "1", display full command-lines when building.
 VERBOSE=
@@ -101,7 +101,10 @@ SOURCES=
 INCLUDES=
 
 # Add additional defines to the build process (without a leading -D).
-DEFINES=
+# Possible defines: 
+# AMS_TMF_SUPPORT => To enable the support of the time of flight board
+# BME688_SUPPORT => To enable the support of the BME688 sensor 
+DEFINES=AMS_TMF_SUPPORT
 
 # Select softfp or hardfp floating point. Default is softfp.
 VFP_SELECT=

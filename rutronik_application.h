@@ -15,6 +15,10 @@
 #include "filter/lowpassfilter.h"
 #include "pasco2/pasco2_app.h"
 
+#ifdef BME688_SUPPORT
+#include "bme688/bme688_app.h"
+#endif
+
 typedef struct
 {
 	uint8_t sensor_fusion_available;	/**< Store if the sensor fusion board is available (1) or not (0) */
@@ -26,6 +30,10 @@ typedef struct
 	pasco2_app_t pasco2_app;
 
 	uint16_t prescaler;
+
+#ifdef BME688_SUPPORT
+	bme688_app_t bme688_app;
+#endif
 
 	lowpassfilter_t filtered_voltage;
 

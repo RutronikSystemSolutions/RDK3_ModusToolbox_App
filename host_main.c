@@ -205,8 +205,10 @@ int host_main_do()
 
 			case CMD_ENABLED_DISABLE_TMF8828_8x8_MODE:
 				printf("CMD_ENABLED_DISABLE_TMF8828_8x8_MODE param: %u \r\n", app.cmd.parameters[0]);
+#ifdef AMS_TMF_SUPPORT
 				// Set 3x3 mode
 				rutronik_application_set_tmf8828_mode(app.rutronik_app, app.cmd.parameters[0]);
+#endif
 				break;
     	}
 
