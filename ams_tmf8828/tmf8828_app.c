@@ -39,7 +39,7 @@ static struct platform_ctx tof_ctx =
 		.gpio_irq = 0,
 		.i2c_addr = TMF8828_I2C_ADDR,
 		.i2cdev = "AMS_TOF_RUTRONIK",
-		.mode_8x8 = 1,
+		.mode_8x8 = 0,
 		.tof = &tof,
 	};
 static struct tmf882x_mode_app_config tofcfg;
@@ -190,7 +190,7 @@ int tmf8828_app_init_measurement()
 	* Enable or disable the 8x8 mode
 	*
 	*************************************************************************/
-	bool mode_8x8 = true;
+	bool mode_8x8 = false;
 	if(tmf882x_ioctl(&tof, IOCAPP_SET_8X8MODE, &mode_8x8, NULL) != 0) return -4;
 
 	/**************************************************************************
@@ -209,11 +209,8 @@ int tmf8828_app_init_measurement()
 	*  - set the spad map configuration to 3x3 (33x32 degree FoV) (in case not 8x8 mode)
 	*
 	*************************************************************************/
-	tofcfg.report_period_ms = 25;
-//#else
-//	tofcfg.report_period_ms = 100;
-//	tofcfg.spad_map_id = 1;
-//#endif
+	tofcfg.report_period_ms = 100;
+	tofcfg.spad_map_id = 1;
 
 	/**************************************************************************
 	*

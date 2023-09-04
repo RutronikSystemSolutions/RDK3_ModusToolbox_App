@@ -243,3 +243,92 @@ notification_t* notification_fabric_create_for_pasco2(uint16_t co2_ppm)
 
 	return retval;
 }
+
+notification_t* notification_fabric_create_for_dps310(float pressure, float temperature)
+{
+	const uint8_t data_size = 8;
+	const uint8_t notification_size = data_size + notification_overhead;
+	const uint16_t sensor_id = 0xA;
+
+	uint8_t* data = (uint8_t*) malloc(notification_size);
+
+	data[0] = (uint8_t) (sensor_id & 0xFF);
+	data[1] = (uint8_t) (sensor_id >> 8);
+
+	data[2] = data_size;
+
+	*((float*) &data[3]) = pressure;
+	*((float*) &data[7]) = temperature;
+
+	data[11] = compute_crc(data, notification_size - 1);
+
+	notification_t* retval = (notification_t*) malloc(sizeof(notification_t));
+	retval->length = notification_size;
+	retval->data = data;
+
+	return retval;
+}
+
+notification_t* notification_fabric_create_for_bmi270(int16_t accx, int16_t accy, int16_t accz, int16_t girx, int16_t giry, int16_t girz)
+{
+	const uint8_t data_size = 12;
+	const uint8_t notification_size = data_size + notification_overhead;
+	const uint16_t sensor_id = 0xB;
+
+	uint8_t* data = (uint8_t*) malloc(notification_size);
+
+	data[0] = (uint8_t) (sensor_id & 0xFF);
+	data[1] = (uint8_t) (sensor_id >> 8);
+
+	data[2] = data_size;
+
+	*((int16_t*) &data[3]) = accx;
+	*((int16_t*) &data[5]) = accy;
+	*((int16_t*) &data[7]) = accz;
+	*((int16_t*) &data[9]) = girx;
+	*((int16_t*) &data[11]) = giry;
+	*((int16_t*) &data[13]) = girz;
+
+	data[notification_size - 1] = compute_crc(data, notification_size - 1);
+
+	notification_t* retval = (notification_t*) malloc(sizeof(notification_t));
+	retval->length = notification_size;
+	retval->data = data;
+
+	return retval;
+}
+
+notification_t* notification_fabric_create_for_bme688(bme688_scan_data_t * values)
+{
+	const uint8_t data_size = sizeof(float) * 4 * 10; // 10 steps. Per step: temperature, pressure, humidity, gas resistance (all floats) => 4 * 4 * 10 => 160 bytes
+	const uint8_t notification_size = data_size + notification_overhead;
+	const uint16_t sensor_id = 0xC;
+
+	uint8_t* data = (uint8_t*) malloc(notification_size);
+
+	data[0] = (uint8_t) (sensor_id & 0xFF);
+	data[1] = (uint8_t) (sensor_id >> 8);
+
+	data[2] = data_size;
+
+	uint8_t index = 3;
+	for (uint8_t i = 0; i < BME688_MAX_STEPS_NB; ++i)
+	{
+		*((float*) &data[index]) = values->steps[i].temperature;
+		index += sizeof(float);
+		*((float*) &data[index]) = values->steps[i].pressure;
+		index += sizeof(float);
+		*((float*) &data[index]) = values->steps[i].humidity;
+		index += sizeof(float);
+		*((float*) &data[index]) = values->steps[i].gas_resistance;
+		index += sizeof(float);
+	}
+
+	data[notification_size - 1] = compute_crc(data, notification_size - 1);
+
+	notification_t* retval = (notification_t*) malloc(sizeof(notification_t));
+	retval->length = notification_size;
+	retval->data = data;
+
+	return retval;
+}

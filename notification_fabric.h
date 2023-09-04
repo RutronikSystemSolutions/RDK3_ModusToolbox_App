@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include "ams_tmf8828/tmf8828_app.h"
+#include "bme688/bme688_app.h"
 
 typedef struct
 {
@@ -35,5 +36,11 @@ notification_t* notification_fabric_create_for_battery_monitor(uint16_t voltage,
 notification_t* notification_fabric_create_for_tmf8828_8x8_mode(uint16_t* distances);
 
 notification_t* notification_fabric_create_for_pasco2(uint16_t co2_ppm);
+
+notification_t* notification_fabric_create_for_dps310(float pressure, float temperature);
+
+notification_t* notification_fabric_create_for_bmi270(int16_t accx, int16_t accy, int16_t accz, int16_t girx, int16_t giry, int16_t girz);
+
+notification_t* notification_fabric_create_for_bme688(bme688_scan_data_t * values);
 
 #endif /* NOTIFICATION_FABRIC_H_ */

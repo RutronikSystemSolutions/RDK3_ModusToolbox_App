@@ -13,12 +13,17 @@
 #include "sht4x/sht4x.h"
 #include "bmp581/bmp581.h"
 #include "sgp40/sgp40.h"
+
+#ifdef AMS_TMF_SUPPORT
 #include "ams_tmf8828/tmf8828_app.h"
+#endif
+
 #include "battery_monitor/battery_monitor.h"
 #include "dio59020/dio59020.h"
+#include "dps310/dps310_app.h"
+#include "bmi270/bmi270_app.h"
 
 #include "host_main.h"
-
 
 static void init_sensors_hal(rutronik_application_t* app)
 {
@@ -26,9 +31,17 @@ static void init_sensors_hal(rutronik_application_t* app)
 	bmp581_init_i2c_interface(hal_i2c_read, hal_i2c_write);
 	sgp40_init(hal_i2c_read, hal_i2c_write, hal_sleep);
 	scd41_app_init(&(app->scd41_app), hal_i2c_read, hal_i2c_write, hal_sleep);
+
+#ifdef AMS_TMF_SUPPORT
 	tmf8828_app_init(hal_i2c_read, hal_i2c_write);
+#endif
+
 	dio59020_init(hal_i2c_read_register, hal_i2c_write_register);
 	pasco2_app_init(hal_i2c_read, hal_i2c_write, hal_sleep);
+	dps310_app_init_i2c_interface(hal_i2c_read, hal_i2c_write);
+#ifdef BME688_SUPPORT
+	bme688_init_i2c_interface(hal_i2c_read, hal_i2c_write);
+#endif
 }
 
 static int is_sensor_fusion_board_available()
@@ -76,6 +89,28 @@ static int init_sgp40(rutronik_application_t* app)
 	return 0;
 }
 
+#ifdef BME688_SUPPORT
+static int init_bme688(rutronik_application_t* app)
+{
+	uint16_t temperatures [10] = {320, 100, 100, 100, 200, 200, 200, 320, 320, 320};
+	uint16_t steps_duration [10] = {5, 2, 10, 30, 5, 5, 5, 5, 5, 5};
+
+	bme688_measurement_configuration_t bme688_configuration;
+	bme688_configuration.heater_step_nb = 10;
+	for(uint16_t i = 0; i < bme688_configuration.heater_step_nb; ++i)
+	{
+		bme688_configuration.temperatures[i] = temperatures[i];
+		bme688_configuration.steps_duration[i] = steps_duration[i];
+	}
+	bme688_configuration.step_ms = 140;
+	bme688_configuration.pressure_os = BME688_OVERSAMPLING_X16;
+	bme688_configuration.temperature_os = BME688_OVERSAMPLING_X16;
+	bme688_configuration.humidity_os = BME688_OVERSAMPLING_X16;
+
+	return bme688_app_init_parallel_mode(&(app->bme688_app), &bme688_configuration);
+}
+#endif
+
 static void init_sensor_fusion(rutronik_application_t* app)
 {
 	if (init_bmp581() != 0)
@@ -89,6 +124,22 @@ static void init_sensor_fusion(rutronik_application_t* app)
 		app->sensor_fusion_available = 0;
 		return;
 	}
+
+	if (bmi270_app_init(hal_i2c_read, hal_i2c_write, hal_sleep_us) != 0)
+	{
+		app->sensor_fusion_available = 0;
+		return;
+	}
+
+#ifdef BME688_SUPPORT
+	if (init_bme688(app) != 0)
+	{
+		app->sensor_fusion_available = 0;
+		return;
+	}
+#endif
+
+	dps310_app_init();
 }
 
 static void init_co2_board(rutronik_application_t* app)
@@ -108,6 +159,7 @@ static void init_co2_board(rutronik_application_t* app)
 	}
 }
 
+#ifdef AMS_TMF_SUPPORT
 static void init_ams_osram_board(rutronik_application_t* app)
 {
 	if(tmf8828_app_init_measurement() != 0)
@@ -116,6 +168,7 @@ static void init_ams_osram_board(rutronik_application_t* app)
 		return;
 	}
 }
+#endif
 
 
 void rutronik_application_init(rutronik_application_t* app)
@@ -144,11 +197,13 @@ void rutronik_application_init(rutronik_application_t* app)
 		init_co2_board(app);
 	}
 
+#ifdef AMS_TMF_SUPPORT
 	if (tmf8828_app_is_board_available() != 0)
 	{
 		app->ams_tof_available = 1;
 		init_ams_osram_board(app);
 	}
+#endif
 }
 
 uint32_t rutronik_application_get_available_sensors_mask(rutronik_application_t* app)
@@ -159,12 +214,14 @@ uint32_t rutronik_application_get_available_sensors_mask(rutronik_application_t*
 			| ((uint32_t) app->ams_tof_available) << 2;
 }
 
+#ifdef AMS_TMF_SUPPORT
 void rutronik_application_set_tmf8828_mode(rutronik_application_t* app, uint8_t mode)
 {
 	if (app->ams_tof_available == 0) return;
 
 	tmf8828_app_request_new_mode(mode);
 }
+#endif
 
 static int measure_sgp40_values(rutronik_application_t* app, float temperature, float humidity, uint16_t * voc_value_raw, uint16_t * voc_value_compensated, int32_t * gas_index)
 {
@@ -194,7 +251,7 @@ void rutronik_application_do(rutronik_application_t* app)
 				host_main_add_notification(notification_fabric_create_for_sht4x(temperature, humidity));
 		}
 
-		app->prescaler = 6;
+		app->prescaler = 9;
 	}
 	else if (app->prescaler == 1)
 	{
@@ -256,9 +313,55 @@ void rutronik_application_do(rutronik_application_t* app)
 						notification_fabric_create_for_pasco2(app->pasco2_app.co2_ppm));
 		}
 	}
+	else if (app->prescaler == 6)
+	{
+		if (app->sensor_fusion_available)
+		{
+			if (dps310_app_do() == 0)
+			{
+				float pressure = 0;
+				float temperature = 0;
+				dps310_app_get_last_values(&temperature, &pressure);
+				host_main_add_notification(notification_fabric_create_for_dps310(pressure, temperature));
+			}
+		}
+	}
+	else if (app->prescaler == 7)
+	{
+		if (app->sensor_fusion_available)
+		{
+			struct bmi2_sensor_data data[2] = { { 0 } };
+			data[ACCEL].type = BMI2_ACCEL;
+			data[GYRO].type = BMI2_GYRO;
+
+			if (bmi270_app_get_sensor_data(data, 2) == 0)
+			{
+				host_main_add_notification(
+						notification_fabric_create_for_bmi270(
+								data[ACCEL].sens_data.acc.x, data[ACCEL].sens_data.acc.y, data[ACCEL].sens_data.acc.z,
+								data[GYRO].sens_data.gyr.x, data[GYRO].sens_data.gyr.y, data[GYRO].sens_data.gyr.z));
+			}
+		}
+	}
+	else if (app->prescaler == 8)
+	{
+#ifdef BME688_SUPPORT
+		if (app->sensor_fusion_available)
+		{
+			if(bme688_app_do(&(app->bme688_app)) == 0)
+			{
+				bme688_scan_data_t last_data;
+				bme688_copy_scan_data(&(app->bme688_app.last_data), &last_data);
+				host_main_add_notification(
+						notification_fabric_create_for_bme688(&last_data));
+			}
+		}
+#endif
+	}
 
 	app->prescaler = app->prescaler - 1;
 
+#ifdef AMS_TMF_SUPPORT
 	/**
 	 * In order to achieve high number of values per seconds
 	 * the values of the TMF8828 are continuously pushed
@@ -279,5 +382,6 @@ void rutronik_application_do(rutronik_application_t* app)
 			}
 		}
 	}
+#endif
 }
 

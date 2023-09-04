@@ -92,7 +92,10 @@ static cy_rslt_t sensor_timer_init(void)
 	//configuration.period = 4999;
 	//configuration.period = 1999;
 	//configuration.period = 999; // 10 Hz -> Period = (999 + 1) / Frequency Hz (clock)
-	configuration.period = 499; // 20 Hz -> Period = (499 + 1) / Frequency Hz (clock)
+
+	//configuration.period = 499; // 20 Hz -> Period = (499 + 1) / Frequency Hz (clock)
+	//configuration.period = 249; // 40Hz
+	configuration.period = 100; // 40Hz
 	configuration.direction = CYHAL_TIMER_DIR_UP;
 	configuration.is_compare = false;
 	configuration.is_continuous = true;
@@ -176,12 +179,6 @@ int main(void)
     result = cyhal_gpio_init(USER_BTN, CYHAL_GPIO_DIR_INPUT, CYHAL_GPIO_DRIVE_PULLUP, CYBSP_BTN_OFF);
     if (result != CY_RSLT_SUCCESS)
     {CY_ASSERT(0);}
-
-
-//    {
-//    	tmf882x_example_run();
-//    }
-
 
 
     rutronik_application_init(&rutronik_app);
