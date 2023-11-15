@@ -18,6 +18,16 @@
 #include "ams_tmf8828/tmf8828_app.h"
 #endif
 
+#ifdef UM980_SUPPORT
+#include "hal/hal_uart.h"
+#include "hal/hal_timer.h"
+#include "um980/um980_app.h"
+#include "um980/gga_packet.h"
+#include "um980/nmea_packet.h"
+// TODO remove me
+#include "um980/packet_printer.h"
+#endif
+
 #include "battery_monitor/battery_monitor.h"
 #include "dio59020/dio59020.h"
 #include "dps310/dps310_app.h"
@@ -42,6 +52,12 @@ static void init_sensors_hal(rutronik_application_t* app)
 #ifdef BME688_SUPPORT
 	bme688_init_i2c_interface(hal_i2c_read, hal_i2c_write);
 #endif
+
+#ifdef UM980_SUPPORT
+	hal_uart_init();
+	hal_timer_init();
+	um980_app_init_hal(hal_uart_readable, hal_uart_read, hal_uart_write, hal_timer_get_uticks);
+#endif
 }
 
 static int is_sensor_fusion_board_available()
@@ -64,6 +80,14 @@ static int is_co2_board_available()
 	// is something goes wrong during the init phase, then set the Co2 board as not present
 	return 1; // By default always here
 }
+
+#ifdef UM980_SUPPORT
+static int is_um980_board_available()
+{
+	if (um980_app_init() != 0) return 0;
+	return 1;
+}
+#endif
 
 static int init_bmp581()
 {
@@ -170,12 +194,49 @@ static void init_ams_osram_board(rutronik_application_t* app)
 }
 #endif
 
+#ifdef UM980_SUPPORT
+
+static uint8_t um980_packet_available = 0;
+static um980_gga_packet_t um980_last_packet;
+
+static void um980_nmea_listener(uint8_t* buffer, uint16_t len)
+{
+	if (nmea_packet_get_type(buffer, len) == PACKET_TYPE_GGA)
+	{
+		if (gga_packet_extract_data(buffer, len, &um980_last_packet) == 0)
+		{
+			um980_packet_available = 1;
+		}
+	}
+}
+
+static void init_um980_board(rutronik_application_t* app)
+{
+	if (um980_app_set_mode_rover() != 0)
+	{
+		app->um980_available = 0;
+		return;
+	}
+
+	// Request position every second
+	if (um980_app_start_gga_generation() != 0)
+	{
+		app->um980_available = 0;
+		return;
+	}
+
+	// Install listener
+	um980_app_set_nmea_listener(um980_nmea_listener);
+}
+#endif
+
 
 void rutronik_application_init(rutronik_application_t* app)
 {
 	app->sensor_fusion_available = 0;
 	app->co2_available = 0;
 	app->ams_tof_available = 0;
+	app->um980_available = 0;
 
 	app->prescaler = 0;
 
@@ -204,6 +265,14 @@ void rutronik_application_init(rutronik_application_t* app)
 		init_ams_osram_board(app);
 	}
 #endif
+
+#ifdef UM980_SUPPORT
+	if (is_um980_board_available() != 0)
+	{
+		app->um980_available = 1;
+		init_um980_board(app);
+	}
+#endif
 }
 
 uint32_t rutronik_application_get_available_sensors_mask(rutronik_application_t* app)
@@ -211,7 +280,9 @@ uint32_t rutronik_application_get_available_sensors_mask(rutronik_application_t*
 	return
 			(uint32_t) app->sensor_fusion_available
 			| ((uint32_t) app->co2_available) << 1
-			| ((uint32_t) app->ams_tof_available) << 2;
+			| ((uint32_t) app->ams_tof_available) << 2
+			// << 3 is for radar board
+			| ((uint32_t) app->um980_available) << 4;
 }
 
 #ifdef AMS_TMF_SUPPORT
@@ -380,6 +451,19 @@ void rutronik_application_do(rutronik_application_t* app)
 				host_main_add_notification(
 						notification_fabric_create_for_tmf8828(tmpf8828_get_last_results()));
 			}
+		}
+	}
+#endif
+
+#ifdef UM980_SUPPORT
+	if (app->um980_available != 0)
+	{
+		um980_app_do();
+		if (um980_packet_available != 0)
+		{
+			um980_packet_available = 0;
+			host_main_add_notification(
+					notification_fabric_create_for_um980(&um980_last_packet));
 		}
 	}
 #endif

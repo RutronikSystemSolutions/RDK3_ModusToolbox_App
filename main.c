@@ -66,10 +66,7 @@
 #include "notification_fabric.h"
 #include "rutronik_application.h"
 
-//#include "ams_tmf8828/Example/Simple/tmf882x_example_simple.h"
-
 static cyhal_timer_t sensor_timer;
-
 static uint8_t timer_interrupt = 0;
 
 static void sensor_timer_isr(void *callback_arg, cyhal_timer_event_t event)
@@ -82,20 +79,15 @@ static void sensor_timer_isr(void *callback_arg, cyhal_timer_event_t event)
 
 static cy_rslt_t sensor_timer_init(void)
 {
-	const uint32_t frequency_hz = 10000;
+	const uint32_t timer_frequency_hz = 10000;
+	const uint32_t isr_frequency_hz = 100;
+
 	const uint8_t priority = 6;
 	cyhal_timer_cfg_t configuration;
 	cy_rslt_t result;
 
 	configuration.compare_value = 0;
-	//configuration.period = 999; // 10 Hz -> Period = (999 + 1) / Frequency Hz (clock)
-	//configuration.period = 4999;
-	//configuration.period = 1999;
-	//configuration.period = 999; // 10 Hz -> Period = (999 + 1) / Frequency Hz (clock)
-
-	//configuration.period = 499; // 20 Hz -> Period = (499 + 1) / Frequency Hz (clock)
-	//configuration.period = 249; // 40Hz
-	configuration.period = 100; // 40Hz
+	configuration.period = (timer_frequency_hz / isr_frequency_hz);
 	configuration.direction = CYHAL_TIMER_DIR_UP;
 	configuration.is_compare = false;
 	configuration.is_continuous = true;
@@ -107,7 +99,7 @@ static cy_rslt_t sensor_timer_init(void)
 	result = cyhal_timer_configure(&sensor_timer, &configuration);
 	if (result != CY_RSLT_SUCCESS) return result;
 
-	result = cyhal_timer_set_frequency(&sensor_timer, frequency_hz);
+	result = cyhal_timer_set_frequency(&sensor_timer, timer_frequency_hz);
 	if (result != CY_RSLT_SUCCESS) return result;
 
 	cyhal_timer_register_callback(&sensor_timer, sensor_timer_isr, NULL);
@@ -184,9 +176,6 @@ int main(void)
     rutronik_application_init(&rutronik_app);
 
     Ble_Init(&rutronik_app);
-
-    /* Run Host main */
-    //HostMain();
 
     uint32_t counter = 0;
 

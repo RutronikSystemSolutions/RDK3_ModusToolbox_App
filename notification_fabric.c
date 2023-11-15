@@ -332,3 +332,59 @@ notification_t* notification_fabric_create_for_bme688(bme688_scan_data_t * value
 
 	return retval;
 }
+
+#ifdef UM980_SUPPORT
+notification_t* notification_fabric_create_for_um980(um980_gga_packet_t* packet)
+{
+	const uint8_t data_size =  8 + 8 * 7; // 8*uint8_t + 7*double
+	const uint8_t notification_size = data_size + notification_overhead;
+	const uint16_t sensor_id = 0xD;
+
+	uint8_t* data = (uint8_t*) malloc(notification_size);
+
+	data[0] = (uint8_t) (sensor_id & 0xFF);
+	data[1] = (uint8_t) (sensor_id >> 8);
+
+	data[2] = data_size;
+
+	uint8_t index = 3;
+	data[index] = packet->hours;
+	index++;
+	data[index] = packet->minutes;
+	index++;
+	data[index] = packet->seconds;
+	index++;
+	data[index] = packet->sub_seconds;
+	index++;
+	*((double*) &data[index]) = packet->lat_degree;
+	index += sizeof(double);
+	*((double*) &data[index]) = packet->lat_seconds;
+	index += sizeof(double);
+	data[index] = packet->lat_dir;
+	index++;
+	*((double*) &data[index]) = packet->lon_degree;
+	index += sizeof(double);
+	*((double*) &data[index]) = packet->lon_seconds;
+	index += sizeof(double);
+	data[index] = packet->lon_dir;
+	index++;
+	data[index] = packet->quality;
+	index++;
+	data[index] = packet->satellites_in_use;
+	index++;
+	*((double*) &data[index]) = packet->hdop;
+	index += sizeof(double);
+	*((double*) &data[index]) = packet->alt;
+	index += sizeof(double);
+	*((double*) &data[index]) = packet->undulation;
+	index += sizeof(double);
+
+	data[notification_size - 1] = compute_crc(data, notification_size - 1);
+
+	notification_t* retval = (notification_t*) malloc(sizeof(notification_t));
+	retval->length = notification_size;
+	retval->data = data;
+
+	return retval;
+}
+#endif

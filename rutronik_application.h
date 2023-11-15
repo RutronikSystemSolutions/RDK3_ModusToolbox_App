@@ -24,6 +24,7 @@ typedef struct
 	uint8_t sensor_fusion_available;	/**< Store if the sensor fusion board is available (1) or not (0) */
 	uint8_t co2_available;				/**< Store if the CO2 board is available (1) or not (0) */
 	uint8_t ams_tof_available;			/**< Store if the AMS OSRAM TOF board is available (1) or not (0) */
+	uint8_t um980_available;			/**< Store if the UM980 board is available (1) or not (0) */
 
 	GasIndexAlgorithmParams gas_index_params;
 	scd41_app_t scd41_app;
