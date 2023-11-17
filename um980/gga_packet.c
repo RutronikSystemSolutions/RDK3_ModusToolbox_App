@@ -131,6 +131,16 @@ int gga_packet_extract_data(uint8_t* buffer, uint16_t len, um980_gga_packet_t* g
 	strbuff[seg_len] = '\0';
 	gga_data->undulation = atof(strbuff);
 
+	// Correction age
+	get_segment_address_and_length(buffer, len, ',', 13, &seg_addr, &seg_len);
+	for(uint16_t i = 0; i < seg_len; ++i)
+	{
+		strbuff[i] = buffer[seg_addr + i];
+	}
+	strbuff[seg_len] = '\0';
+	if (seg_len == 0) gga_data->correction_age = 999;
+	else gga_data->correction_age = (uint16_t) atoi(strbuff);
+
 	return 0;
 }
 

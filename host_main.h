@@ -14,7 +14,9 @@
 #include "linked_list.h"
 #include "rutronik_application.h"
 
-#define BLE_CMD_PARAM_MAX_SIZE 32
+#define BLEMAX_MTU_SIZE	512
+
+#define BLE_CMD_PARAM_MAX_SIZE (BLEMAX_MTU_SIZE - 1) // -1 because first by is the command type
 #define BLE_ACK_MAX_SIZE 32
 
 #define BLE_MODE_CONFIGURATION	1
@@ -23,6 +25,7 @@
 typedef struct
 {
 	uint8_t command;
+	uint16_t len;
 	uint8_t parameters[BLE_CMD_PARAM_MAX_SIZE];
 } ble_cmt_t;
 

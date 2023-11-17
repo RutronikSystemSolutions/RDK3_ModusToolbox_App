@@ -55,6 +55,10 @@
 #include "cycfg_ble.h"
 #include "stdio.h"
 
+#ifdef UM980_SUPPORT
+#include "hal/hal_uart.h"
+#endif
+
 
 /******************************************************************************
 * Macros
@@ -70,28 +74,29 @@
 #define DEBUG_BLE(...)
 #endif
 
-#define MAX_MTU_SIZE                (512)
 #define DEFAULT_MTU_SIZE            (23) 
-#define NOTIFICATION_PKT_SIZE       (495)
+#define NOTIFICATION_PKT_SIZE       (BLEMAX_MTU_SIZE)
 #define SUCCESS                     (0u)
 #define TARGET_BDADDR       {{0xFF, 0xBB, 0xAA, 0x50, 0xA0, 0x00}, 0}
-#define CUSTOM_ACC_X_DECL_HANDLE		cy_ble_customsConfig.attrInfo[0].customServInfo[0].customServCharDesc[0]
-#define CUSTOM_ACC_X_CHAR_HANDLE			cy_ble_customsConfig.attrInfo[0].customServInfo[0].customServCharHandle
 
+// TODO rename the name of the characteristic
+#define CUSTOM_ACC_X_DECL_HANDLE		cy_ble_customsConfig.attrInfo[0].customServInfo[0].customServCharDesc[0]
+#define CUSTOM_ACC_X_CHAR_HANDLE		cy_ble_customsConfig.attrInfo[0].customServInfo[0].customServCharHandle
 
 
 static host_main_t app;
 
-
 /*******************************************************************************
 * Variables
 *******************************************************************************/
-//bool charNotificationEnabled = false;
+// TODO rename accx_value...
 uint8 accx_value[NOTIFICATION_PKT_SIZE];
 uint32_t counter = 0;
 uint16 negotiatedMtu = DEFAULT_MTU_SIZE;
 cy_stc_ble_gap_bd_addr_t    local_addr = TARGET_BDADDR;
 cy_stc_ble_conn_handle_t appConnHandle;
+
+// TODO init notificationPacket by linking values with the buffer accx_value
 cy_stc_ble_gatts_handle_value_ntf_t notificationPacket;
 /* BLESS interrupt configuration.
  * It is used when BLE middleware operates in BLE Single CM4 Core mode. */
@@ -140,13 +145,6 @@ int host_main_add_notification(notification_t* notification)
 
 	// Add to the list
 	linked_list_add_element(&app.notification_list, (void*)notification);
-
-//	if (app.notification_to_send == 0)
-//	{
-//		app.notification = notification;
-//		app.notification_to_send = 1;
-//	}
-
 	return 0;
 }
 
@@ -154,8 +152,6 @@ int host_main_is_ready_for_notification()
 {
 	if(app.notification_enabled == 0) return 0;
 	if (app.mode != BLE_MODE_PUSH_DATA) return 0;
-	//if (app.notification_to_send != 0) return 0;
-
 	return 1;
 }
 
@@ -167,7 +163,8 @@ int host_main_do()
 		CMD_GET_AVAILABLE_SENSORS = 0,
 		CMD_START_PUSH_MODE = 1,
 		CMD_STOP_PUSH_MODE = 2,
-		CMD_ENABLED_DISABLE_TMF8828_8x8_MODE = 3
+		CMD_ENABLED_DISABLE_TMF8828_8x8_MODE = 3,
+		CMD_NTRIP_DATA = 4
 	};
 
     // Cy_Ble_ProcessEvents() allows BLE stack to process pending events
@@ -210,6 +207,35 @@ int host_main_do()
 				rutronik_application_set_tmf8828_mode(app.rutronik_app, app.cmd.parameters[0]);
 #endif
 				break;
+
+			case CMD_NTRIP_DATA:
+				printf("CMD_NTRIP_DATA len: %u \r\n", app.cmd.len);
+#ifdef UM980_SUPPORT
+				// TODO: do not directly push? -> Make it in another file?
+				// Remark: do not send the ACK (App is in push mode configuration)
+				// In the future, use another characteristic for configuration?
+				{
+					uint16_t index = 0;
+					uint16_t count = app.cmd.len - 1;
+					while(count > 0)
+					{
+						size_t tosend_uart = count;
+						int written = hal_uart_write(&app.cmd.parameters[index], tosend_uart);
+						if (written < 0 )
+						{
+							printf("UM980 ntrip write error %d \r\n", written);
+							break;
+						}
+						count -= written;
+						index += written;
+					}
+				}
+#endif
+				break;
+
+			default:
+				printf("Unknown command: %d \r\n", app.cmd.command);
+
     	}
 
     	app.cmd_to_process = 0;
@@ -223,6 +249,8 @@ int host_main_do()
     		// Any acknowledge to be sent?
     		if (app.ack_to_send != 0)
     		{
+    			printf("Send ack: %d \r\n", app.ack_content[0]);
+
     			SendAnswerNotification(app.ack_len, app.ack_content);
     			counter++;
     			app.ack_to_send = 0;
@@ -231,13 +259,6 @@ int host_main_do()
     		// Push mode?
     		if (app.mode == BLE_MODE_PUSH_DATA)
     		{
-//    			if (app.notification_to_send == 1)
-//    			{
-//					SendAnswerNotification(app.notification->length, app.notification->data);
-//					notification_fabric_free_notification(app.notification);
-//					app.notification_to_send = 0;
-//    			}
-
     			// Something inside the list
     			if (app.notification_list.element_count > 0)
     			{
@@ -249,129 +270,8 @@ int host_main_do()
     	}
     }
 
-
-//	if(app.notification_enabled == true)
-//	{
-//		if(Cy_BLE_GATT_GetBusyStatus(appConnHandle.attId) == CY_BLE_STACK_STATE_FREE)
-//		{
-//			if (sendsomething == 1)
-//			{
-//				sendsomething = 0;
-//				printf("send notification \r\n");
-//				/* Send notification data to the GATT Client*/
-//				SendAnswerNotification(4, counter);
-//				counter++;
-//			}
-//		}
-//	}
-
 	return 0;
 }
-
-//int HostMain(void)
-//{
-////    //__enable_irq(); /* Enable global interrupts. */
-////
-////    /* \x1b[2J\x1b[;H - ANSI ESC sequence for clear screen */
-////    printf("\x1b[2J\x1b[;H");
-////
-////    printf("RDK3 BLE Throughput Measurement\r\n");
-////    printf("Role : Server\r\n");
-////
-////    /* Initialize BLE */
-////    //Ble_Init();
-////
-////    uint32_t startTick = 0x00FFFFFF;
-////    Cy_SysTick_Init(CY_SYSTICK_CLOCK_SOURCE_CLK_LF, startTick);
-////    Cy_SysTick_Enable();
-//
-////    int i = 0;
-////
-////    for(;;)
-////    {
-////    	uint32_t tick = Cy_SysTick_GetValue();
-////    	printf("tick %ld \r\n", tick);
-////    	Cy_SysLib_Delay(250);
-////
-////    	i++;
-////    	if (i > 5)
-////    	{
-////    		Cy_SysTick_Clear();
-////    		printf("clear \r\n");
-////    		i = 0;
-////    	}
-////    }
-//
-//
-//	// 778 -> 100ms ...
-//
-//    uint16_t len = 10;
-//
-//    /* Variable 'buffer' holds dummy notification data to be send for
-//       BLE throughput measurement */
-////    for(uint16_t i=0; i < NOTIFICATION_PKT_SIZE; i++)
-////    {
-////        accx_value[i]=i;
-////    }
-//    for(;;)
-//    {
-//        /* Cy_Ble_ProcessEvents() allows BLE stack to process pending events */
-//        Cy_BLE_ProcessEvents();
-//
-//
-//		if(app.notification_enabled != 0)
-//		{
-//			if(Cy_BLE_GATT_GetBusyStatus(appConnHandle.attId) == CY_BLE_STACK_STATE_FREE)
-//			{
-//				if (sendsomething == 1)
-//				{
-//					sendsomething = 0;
-//					printf("send notification \r\n");
-//					/* Send notification data to the GATT Client*/
-//					// SendNotification();
-//					// SendAnswerNotification(len, Cy_SysTick_GetValue());
-//					SendAnswerNotification(len, counter);
-//					if (len == 10) len = 20;
-//					else len = 10;
-//
-//					counter++;
-//				}
-//			}
-//		}
-//
-////        uint32_t tick = Cy_SysTick_GetValue();
-////        if (tick > startTick)
-////        {
-////        	// Should never be the case, but well, who knows :-p
-////        	Cy_SysTick_Clear();
-////        	continue;
-////        }
-////        else
-////        {
-////        	uint32_t diff = startTick - tick;
-////        	if (diff > 24000)
-////        	{
-////        		Cy_SysTick_Clear();
-////
-////        		if(app.notification_enabled != 0)
-////				{
-////					if(Cy_BLE_GATT_GetBusyStatus(appConnHandle.attId) == CY_BLE_STACK_STATE_FREE)
-////					{
-////						printf("send notification \r\n");
-////						/* Send notification data to the GATT Client*/
-////						// SendNotification();
-////						SendAnswerNotification(len);
-////						if (len == 10) len = 20;
-////						else len = 10;
-////					}
-////				}
-////        	}
-////        }
-//
-//    }
-//
-//    return 0;
-//}
 
 /*******************************************************************************
 * Function Name: Ble_Init()
@@ -791,7 +691,8 @@ void StackEventHandler(uint32 event, void* eventParam)
         {
             negotiatedMtu = (((cy_stc_ble_gatt_xchg_mtu_param_t *)eventParam)->mtu < CY_BLE_GATT_MTU) ?
                             ((cy_stc_ble_gatt_xchg_mtu_param_t *)eventParam)->mtu : CY_BLE_GATT_MTU;
-            DEBUG_BLE("CY_BLE_EVT_GATTS_XCNHG_MTU_REQ negotiated = %d\r\n", negotiatedMtu);
+            //DEBUG_BLE("CY_BLE_EVT_GATTS_XCNHG_MTU_REQ negotiated = %d\r\n", negotiatedMtu);
+            printf("Negotiated MTU size: %d \r\n", negotiatedMtu);
             
             break;
         }   
@@ -842,13 +743,9 @@ void StackEventHandler(uint32 event, void* eventParam)
             }
 			else if(write_req_param->handleValPair.attrHandle == (CUSTOM_ACC_X_CHAR_HANDLE))
 			{
-				// Remark: was on for test
-				printf("CUSTOM_ACC_X_CHAR_HANDLE \r\n");
-//				printf("len : %d \r\n", write_req_param->handleValPair.value.len);
-//				printf("value 0 : %d \r\n", write_req_param->handleValPair.value.val[0]);
-//				printf("value 1 : %d \r\n", write_req_param->handleValPair.value.val[1]);
+				printf("Write to custom characteristic detected. \r\n");
 
-
+				// Send the ACK
 				if(Cy_BLE_GATTS_WriteRsp(write_req_param->connHandle) != CY_BLE_SUCCESS)
 				{
 					DEBUG_BLE("Failed to send write response \r\n");
@@ -856,12 +753,12 @@ void StackEventHandler(uint32 event, void* eventParam)
 				}
 				else
 				{
-					printf("Allright, sent ACK \r\n");
 					uint16_t len = write_req_param->handleValPair.value.len;
 					if (len > 0)
 					{
 						// First byte is the command, then the parameters
 						app.cmd.command = write_req_param->handleValPair.value.val[0];
+						app.cmd.len = len;
 
 						for(uint16_t i = 0; (i < len - 1) && (i < BLE_CMD_PARAM_MAX_SIZE); ++i)
 							app.cmd.parameters[i] = write_req_param->handleValPair.value.val[i + 1];

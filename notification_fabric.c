@@ -336,7 +336,7 @@ notification_t* notification_fabric_create_for_bme688(bme688_scan_data_t * value
 #ifdef UM980_SUPPORT
 notification_t* notification_fabric_create_for_um980(um980_gga_packet_t* packet)
 {
-	const uint8_t data_size =  8 + 8 * 7; // 8*uint8_t + 7*double
+	const uint8_t data_size =  1 * 8 + 2 * 1 + 8 * 7; // 8*uint8_t + 1*uint16_t + 7*double
 	const uint8_t notification_size = data_size + notification_overhead;
 	const uint16_t sensor_id = 0xD;
 
@@ -378,6 +378,8 @@ notification_t* notification_fabric_create_for_um980(um980_gga_packet_t* packet)
 	index += sizeof(double);
 	*((double*) &data[index]) = packet->undulation;
 	index += sizeof(double);
+	*((uint16*) &data[index]) = packet->correction_age;
+	index += sizeof(uint16_t);
 
 	data[notification_size - 1] = compute_crc(data, notification_size - 1);
 

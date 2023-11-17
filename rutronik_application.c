@@ -24,8 +24,6 @@
 #include "um980/um980_app.h"
 #include "um980/gga_packet.h"
 #include "um980/nmea_packet.h"
-// TODO remove me
-#include "um980/packet_printer.h"
 #endif
 
 #include "battery_monitor/battery_monitor.h"

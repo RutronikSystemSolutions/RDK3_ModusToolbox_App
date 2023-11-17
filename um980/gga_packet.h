@@ -28,6 +28,7 @@ typedef struct
 	double alt; /**< Altitude above/below MSL (geoid) */
 	double undulation;	/**< Geoidal separation, the difference between the Earth ellipsoid surface and mean-sealevel (geoid) surface.
 							If the geoid is above the ellipsoid, the value is positive; otherwise, it is negative. */
+	uint16_t correction_age;
 } um980_gga_packet_t;
 
 /**
