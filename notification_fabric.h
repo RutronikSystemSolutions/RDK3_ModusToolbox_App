@@ -13,6 +13,10 @@
 #include "ams_tmf8828/tmf8828_app.h"
 #include "bme688/bme688_app.h"
 
+#ifdef UM980_SUPPORT
+#include "um980/gga_packet.h"
+#endif
+
 typedef struct
 {
 	uint8_t length;
@@ -42,5 +46,9 @@ notification_t* notification_fabric_create_for_dps310(float pressure, float temp
 notification_t* notification_fabric_create_for_bmi270(int16_t accx, int16_t accy, int16_t accz, int16_t girx, int16_t giry, int16_t girz);
 
 notification_t* notification_fabric_create_for_bme688(bme688_scan_data_t * values);
+
+#ifdef UM980_SUPPORT
+notification_t* notification_fabric_create_for_um980(um980_gga_packet_t* packet);
+#endif
 
 #endif /* NOTIFICATION_FABRIC_H_ */

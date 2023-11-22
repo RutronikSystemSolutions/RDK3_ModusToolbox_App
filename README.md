@@ -49,6 +49,7 @@ The notifications sends by the RDK3 always have the same format (see notificatio
     - 0xA: DPS310
     - 0xB: BMI270
     - 0xC: BME688
+    - 0xD: UM980 position
 - [2] size of the data contained inside the notification (without sensor id and crc)
 - [3.. size - 2] data (depends on the sensor)
 - [size + 4 - 1] crc (at the moment always 0x3)
@@ -60,10 +61,11 @@ To add a new board / you will first have to add the driver for it. Since the RDK
 See the file Makefile. Remove AMS_TMF_SUPPORT for example to free some space.
     
     # Add additional defines to the build process (without a leading -D).
-    # Possible defines: 
-    # AMS_TMF_SUPPORT => To enable the support of the time of flight board
-    # BME688_SUPPORT => To enable the support of the BME688 sensor 
-    DEFINES=AMS_TMF_SUPPORT BME688_SUPPORT
+	# Possible defines: 
+	# AMS_TMF_SUPPORT => To enable the support of the time of flight board
+	# BME688_SUPPORT => To enable the support of the BME688 sensor 
+	# UM980_SUPPORT => To enable the support of the UM980 sensor
+	DEFINES=AMS_TMF_SUPPORT BME688_SUPPORT UM980_SUPPORT
 
 Inside the file rutronik_application.c, you will have to implement the logic (how to init and read the data of the sensor).
 
