@@ -137,6 +137,7 @@ int main(void)
 
     printf("------------------------- \r\n");
     printf("Starting RDK3 application \r\n");
+    printf("Enabling control over Smartphone App \r\n");
     printf("------------------------- \r\n");
 
     /* Initialize the User LEDs */

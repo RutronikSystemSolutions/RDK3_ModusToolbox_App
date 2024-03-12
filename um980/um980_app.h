@@ -12,6 +12,14 @@
 
 #include "packet_handler.h"
 
+typedef enum
+{
+	FREQUENCY_1HZ,
+	FREQUENCY_2HZ,
+	FREQUENCY_5HZ,
+	FREQUENCY_10HZ
+} um980_frequency_hz_t;
+
 typedef void (*um980_app_on_nmea_packet)(uint8_t* buffer, uint16_t len);
 
 /**
@@ -52,10 +60,12 @@ int um980_app_unlog();
 /**
  * @brief Start the generation of GGA output messages (contains position, time, ...)
  *
+ * @param [in] frequency Output frequency to be used
+ *
  * @retval 0 Success
  * @retval != 0 Error
  */
-int um980_app_start_gga_generation();
+int um980_app_start_gga_generation(um980_frequency_hz_t frequency);
 
 /**
  * @brief Set the UM980 as a base mode

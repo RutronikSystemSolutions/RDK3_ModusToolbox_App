@@ -27,7 +27,7 @@ static um980_app_on_nmea_packet nmea_listener = NULL;
 #define PACKET_BUFFER_SIZE 512
 static uint8_t packet_buffer[PACKET_BUFFER_SIZE] = {0};
 
-#define MAX_CMD_LEN 64
+#define MAX_CMD_LEN 128
 
 static const uint32_t timeout_us = 100000; // 100ms
 
@@ -117,10 +117,10 @@ static int send_command_and_wait(char* cmd)
 		// Check for timeout
 		uint32_t current_time = get_uticks_func();
 		if (current_time < start_time) return -3;
-		if ((current_time - start_time) > timeout_us) return -3;
+		if ((current_time - start_time) > timeout_us) return -4;
 	}
 
-	return -4;
+	return -5;
 }
 
 static void wait_us(uint32_t us)
@@ -182,9 +182,16 @@ int um980_app_start_correction_generation(uint16_t rtcm_number, uint16_t period)
 	return send_command_and_wait(cmd);
 }
 
-int um980_app_start_gga_generation()
+int um980_app_start_gga_generation(um980_frequency_hz_t frequency)
 {
-	return send_command_and_wait("gpgga 1");
+	switch(frequency)
+	{
+		case FREQUENCY_1HZ: return send_command_and_wait("gpgga 1");
+		case FREQUENCY_2HZ: return send_command_and_wait("gpgga 0.5");
+		case FREQUENCY_5HZ: return send_command_and_wait("gpgga 0.2");
+		case FREQUENCY_10HZ: return send_command_and_wait("gpgga 0.1");
+	}
+	return -1;
 }
 
 int um980_app_do()
