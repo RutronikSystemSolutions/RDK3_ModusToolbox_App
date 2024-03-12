@@ -79,9 +79,14 @@
 #define SUCCESS                     (0u)
 #define TARGET_BDADDR       {{0xFF, 0xBB, 0xAA, 0x50, 0xA0, 0x00}, 0}
 
-// TODO rename the name of the characteristic
-#define CUSTOM_ACC_X_DECL_HANDLE		cy_ble_customsConfig.attrInfo[0].customServInfo[0].customServCharDesc[0]
-#define CUSTOM_ACC_X_CHAR_HANDLE		cy_ble_customsConfig.attrInfo[0].customServInfo[0].customServCharHandle
+/**
+ * Get access to the custom characteristic and to its descriptor.
+ * The characteristic can be configured using the Bluetooth Configurator tool
+ * The descriptor enables to configure the behavior of the characteristic.
+ * In our case, it will be used to enable or disable notifications
+ */
+#define CUSTOM_DESCR_HANDLE	cy_ble_customsConfig.attrInfo[0].customServInfo[0].customServCharDesc[0]
+#define CUSTOM_CHAR_HANDLE	cy_ble_customsConfig.attrInfo[0].customServInfo[0].customServCharHandle
 
 
 static host_main_t app;
@@ -89,15 +94,22 @@ static host_main_t app;
 /*******************************************************************************
 * Variables
 *******************************************************************************/
-// TODO rename accx_value...
-uint8 accx_value[NOTIFICATION_PKT_SIZE];
-uint32_t counter = 0;
-uint16 negotiatedMtu = DEFAULT_MTU_SIZE;
-cy_stc_ble_gap_bd_addr_t    local_addr = TARGET_BDADDR;
-cy_stc_ble_conn_handle_t appConnHandle;
 
-// TODO init notificationPacket by linking values with the buffer accx_value
+/**
+ * Buffer storing 512 bytes (maximum MTU size)
+ * Used when sending notifications
+ */
+uint8 notification_buffer[NOTIFICATION_PKT_SIZE];
+
+/**
+ * Store the size of the MTU transfer
+ */
+uint16 negotiatedMtu = DEFAULT_MTU_SIZE;
+
+cy_stc_ble_gap_bd_addr_t local_addr = TARGET_BDADDR;
+cy_stc_ble_conn_handle_t appConnHandle;
 cy_stc_ble_gatts_handle_value_ntf_t notificationPacket;
+
 /* BLESS interrupt configuration.
  * It is used when BLE middleware operates in BLE Single CM4 Core mode. */
 const cy_stc_sysint_t blessIsrCfg =
@@ -252,7 +264,6 @@ int host_main_do()
     			printf("Send ack: %d \r\n", app.ack_content[0]);
 
     			SendAnswerNotification(app.ack_len, app.ack_content);
-    			counter++;
     			app.ack_to_send = 0;
     		}
 
@@ -313,10 +324,8 @@ void Ble_Init(rutronik_application_t* rutronik_app)
 	init_app();
 	app.rutronik_app = rutronik_app;
 
-	for(uint16_t i=0; i < NOTIFICATION_PKT_SIZE; i++)
-	{
-		accx_value[i]=i;
-	}
+	notificationPacket.handleValPair.value.val = notification_buffer;
+	notificationPacket.handleValPair.value.len = NOTIFICATION_PKT_SIZE;
 
     /* Initialize the BLESS interrupt */
     cy_ble_config.hw->blessIsrConfig = &blessIsrCfg;
@@ -387,7 +396,7 @@ void StackEventHandler(uint32 event, void* eventParam)
                     apiResult);
             }
                         
-             DEBUG_BLE("CUSTOM_SERV0_CHAR0_DESC0_HANDLE (%d)""\r\nCUSTOM_SERV0_CHAR0_HANDLE(%d)\r\n",CUSTOM_ACC_X_DECL_HANDLE, CUSTOM_ACC_X_CHAR_HANDLE);
+             DEBUG_BLE("CUSTOM_SERV0_CHAR0_DESC0_HANDLE (%d)""\r\nCUSTOM_SERV0_CHAR0_HANDLE(%d)\r\n",CUSTOM_DESCR_HANDLE, CUSTOM_CHAR_HANDLE);
             
             /* Enter into discoverable mode so that remote device can search it */
             Cy_BLE_GAPP_StartAdvertisement(CY_BLE_ADVERTISING_FAST, CY_BLE_PERIPHERAL_CONFIGURATION_0_INDEX);
@@ -663,9 +672,7 @@ void StackEventHandler(uint32 event, void* eventParam)
             
             /* Update Notification packet with the data. */
             notificationPacket.connHandle = appConnHandle;
-            notificationPacket.handleValPair.attrHandle = CUSTOM_ACC_X_CHAR_HANDLE;
-            notificationPacket.handleValPair.value.val = accx_value;
-            notificationPacket.handleValPair.value.len = NOTIFICATION_PKT_SIZE;
+            notificationPacket.handleValPair.attrHandle = CUSTOM_CHAR_HANDLE;
             
             Cy_BLE_GetPhy(appConnHandle.bdHandle);                   
            
@@ -717,10 +724,10 @@ void StackEventHandler(uint32 event, void* eventParam)
             
             DEBUG_BLE("write_req_param->handleValPair.attrHandle = %d",\
                 write_req_param->handleValPair.attrHandle);
-            DEBUG_BLE(" -> Should be = CUSTOM_SERV0_CHAR0_DESC0_HANDLE (%d)\r\n-> Should be = CUSTOM_SERV0_CHAR0_HANDLE(%d)\r\n",CUSTOM_ACC_X_DECL_HANDLE, CUSTOM_ACC_X_CHAR_HANDLE);
+            DEBUG_BLE(" -> Should be = CUSTOM_SERV0_CHAR0_DESC0_HANDLE (%d)\r\n-> Should be = CUSTOM_SERV0_CHAR0_HANDLE(%d)\r\n",CUSTOM_DESCR_HANDLE, CUSTOM_CHAR_HANDLE);
                   
            
-			if(write_req_param->handleValPair.attrHandle == (CUSTOM_ACC_X_DECL_HANDLE))
+			if(write_req_param->handleValPair.attrHandle == (CUSTOM_DESCR_HANDLE))
             {
                 if(Cy_BLE_GATTS_WriteRsp(write_req_param->connHandle) != CY_BLE_SUCCESS)
                 {
@@ -734,14 +741,12 @@ void StackEventHandler(uint32 event, void* eventParam)
                     DEBUG_BLE("app.notification_enabled = %d\r\n", app.notification_enabled);
                     printf("Notification Enabled.\r\n\n");
                     notificationPacket.connHandle = appConnHandle;
-                    notificationPacket.handleValPair.attrHandle = CUSTOM_ACC_X_CHAR_HANDLE;
-                    notificationPacket.handleValPair.value.val = accx_value;
-                    notificationPacket.handleValPair.value.len = NOTIFICATION_PKT_SIZE;
+                    notificationPacket.handleValPair.attrHandle = CUSTOM_CHAR_HANDLE;
                 }
 
                 printf("Allright \r\n");
             }
-			else if(write_req_param->handleValPair.attrHandle == (CUSTOM_ACC_X_CHAR_HANDLE))
+			else if(write_req_param->handleValPair.attrHandle == (CUSTOM_CHAR_HANDLE))
 			{
 				printf("Write to custom characteristic detected. \r\n");
 
@@ -776,7 +781,7 @@ void StackEventHandler(uint32 event, void* eventParam)
 			}
 			else
 			{
-				printf("Not correct is %d but should be %d \r\n", write_req_param->handleValPair.attrHandle, CUSTOM_ACC_X_DECL_HANDLE);
+				printf("Not correct is %d but should be %d \r\n", write_req_param->handleValPair.attrHandle, CUSTOM_DESCR_HANDLE);
 			}
             break;
         }
@@ -830,8 +835,6 @@ void SendAnswerNotification(uint16_t len, uint8_t* content)
 
     for(uint16 i = 0; i < len; ++i)
     	notificationPacket.handleValPair.value.val[i] = content[i];
-
-    	//*(uint32_t*)notificationPacket.handleValPair.value.val = tosend;
 
     apiResult = Cy_BLE_GATTS_Notification(&notificationPacket);
     if(apiResult == CY_BLE_ERROR_INVALID_PARAMETER)
