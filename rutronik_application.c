@@ -82,7 +82,10 @@ static int is_co2_board_available()
 #ifdef UM980_SUPPORT
 static int is_um980_board_available()
 {
-	if (um980_app_init() != 0) return 0;
+	if (um980_app_init() != 0)
+	{
+		return 0;
+	}
 	return 1;
 }
 #endif
@@ -217,7 +220,7 @@ static void init_um980_board(rutronik_application_t* app)
 	}
 
 	// Request position every second
-	if (um980_app_start_gga_generation() != 0)
+	if (um980_app_start_gga_generation(FREQUENCY_1HZ) != 0)
 	{
 		app->um980_available = 0;
 		return;
@@ -305,7 +308,6 @@ static int measure_sgp40_values(rutronik_application_t* app, float temperature, 
 void rutronik_application_do(rutronik_application_t* app)
 {
 	if (host_main_is_ready_for_notification() == 0) return;
-
 
 	// This function is called every 50ms (20Hz)
 	// Only read the values every 250ms (4Hz) for CO2 and sensor fusion

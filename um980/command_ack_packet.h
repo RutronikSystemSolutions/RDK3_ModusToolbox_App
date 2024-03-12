@@ -10,7 +10,7 @@
 
 #include <stdint.h>
 
-#define COMMAND_ACK_COMMAND_MAX_LENGTH	32
+#define COMMAND_ACK_COMMAND_MAX_LENGTH	128
 #define COMMAND_ACK_OK		0
 #define COMMAND_ACK_NOT_OK	1
 

@@ -19,7 +19,7 @@ int hal_timer_init()
 		//   compared to event being measured
 		.direction     = CYHAL_TIMER_DIR_UP, // Timer counts up
 		.is_compare    = false,              // Don't use compare mode
-		.is_continuous = false,              // Do not run timer indefinitely
+		.is_continuous = true,              // Run timer indefinitely
 		.value         = 0                   // Initial value of counter
 	};
 
