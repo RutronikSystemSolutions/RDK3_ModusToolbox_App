@@ -239,7 +239,21 @@ void rutronik_application_init(rutronik_application_t* app)
 	app->ams_tof_available = 0;
 	app->um980_available = 0;
 
-	app->prescaler = 0;
+	// Init prescalers
+	// 1 Hz prescalers -> shifted by 10ms (to avoid to many I2C read inside one loop)
+	app->sht4x_prescaler = 0;
+	app->sgp40_prescaler = 10;
+	app->bmp581_prescaler = 20;
+	app->scd41_prescaler = 30;
+	app->battery_prescaler = 40;
+	app->pasco2_prescaler = 50;
+	app->dps310_prescaler = 60;
+
+	// 10 Hz
+	app->bmi270_prescaler = 0;
+
+	// 5 Hz
+	app->bme688_prescaler = 0;
 
 	lowpassfilter_init(&app->filtered_voltage, 0.01);
 
@@ -305,13 +319,15 @@ static int measure_sgp40_values(rutronik_application_t* app, float temperature, 
 	return 0;
 }
 
+/**
+ * Remark: this function is called every 10ms (100Hz)
+ */
 void rutronik_application_do(rutronik_application_t* app)
 {
-	if (host_main_is_ready_for_notification() == 0) return;
-
-	// This function is called every 50ms (20Hz)
-	// Only read the values every 250ms (4Hz) for CO2 and sensor fusion
-	if (app->prescaler == 0)
+	/**
+	 * SHT41
+	 */
+	if (app->sht4x_prescaler == 0)
 	{
 		if (app->sensor_fusion_available != 0)
 		{
@@ -321,10 +337,16 @@ void rutronik_application_do(rutronik_application_t* app)
 			if (sht4x_get_temperature_and_humidity(&temperature, &humidity) == 0)
 				host_main_add_notification(notification_fabric_create_for_sht4x(temperature, humidity));
 		}
-
-		app->prescaler = 9;
 	}
-	else if (app->prescaler == 1)
+	// 1 Hz prescaler (100 Hz / 100 = 1 Hz)
+	app->sht4x_prescaler++;
+	if (app->sht4x_prescaler >= 100) app->sht4x_prescaler = 0;
+
+
+	/**
+	 * SGP40
+	 */
+	if (app->sgp40_prescaler == 0)
 	{
 		if (app->sensor_fusion_available != 0)
 		{
@@ -338,7 +360,14 @@ void rutronik_application_do(rutronik_application_t* app)
 				host_main_add_notification(notification_fabric_create_for_sgp40(voc_value_raw, voc_value_compensated, (uint16_t) gas_index));
 		}
 	}
-	else if (app->prescaler == 2)
+	// 1 Hz prescaler (100 Hz / 100 = 1 Hz)
+	app->sgp40_prescaler++;
+	if (app->sgp40_prescaler >= 100) app->sgp40_prescaler = 0;
+
+	/**
+	 * BMP581
+	 */
+	if (app->bmp581_prescaler == 0)
 	{
 		float temperature = 0;
 		float pressure = 0;
@@ -346,7 +375,14 @@ void rutronik_application_do(rutronik_application_t* app)
 		if (bmp581_read_pressure_and_temperature(&pressure, &temperature) == 0)
 			host_main_add_notification(notification_fabric_create_for_bmp581(pressure, temperature));
 	}
-	else if (app->prescaler == 3)
+	// 1 Hz prescaler (100 Hz / 100 = 1 Hz)
+	app->bmp581_prescaler++;
+	if (app->bmp581_prescaler >= 100) app->bmp581_prescaler = 0;
+
+	/**
+	 * SCD41
+	 */
+	if (app->scd41_prescaler == 0)
 	{
 		if(app->co2_available != 0)
 		{
@@ -355,7 +391,14 @@ void rutronik_application_do(rutronik_application_t* app)
 						notification_fabric_create_for_scd41(app->scd41_app.value.co2_ppm, app->scd41_app.value.temperature, app->scd41_app.value.humidity));
 		}
 	}
-	else if (app->prescaler == 4)
+	// 1 Hz prescaler (100 Hz / 100 = 1 Hz)
+	app->scd41_prescaler++;
+	if (app->scd41_prescaler >= 100) app->scd41_prescaler = 0;
+
+	/**
+	 * Battery monitor
+	 */
+	if (app->battery_prescaler == 0)
 	{
 		// Get the battery voltage
 		uint16_t battery_voltage = battery_monitor_get_voltage_mv();
@@ -375,7 +418,14 @@ void rutronik_application_do(rutronik_application_t* app)
 		host_main_add_notification(
 				notification_fabric_create_for_battery_monitor(battery_voltage, (uint8_t) charge_stat, (uint8_t) chrg_fault, dio_status));
 	}
-	else if (app->prescaler == 5)
+	// 1 Hz prescaler (100 Hz / 100 = 1 Hz)
+	app->battery_prescaler++;
+	if (app->battery_prescaler >= 100) app->battery_prescaler = 0;
+
+	/**
+	 * PAS CO2
+	 */
+	if (app->pasco2_prescaler == 0)
 	{
 		if(app->co2_available != 0)
 		{
@@ -384,7 +434,15 @@ void rutronik_application_do(rutronik_application_t* app)
 						notification_fabric_create_for_pasco2(app->pasco2_app.co2_ppm));
 		}
 	}
-	else if (app->prescaler == 6)
+	// 1 Hz prescaler (100 Hz / 100 = 1 Hz)
+	app->pasco2_prescaler++;
+	if (app->pasco2_prescaler >= 100) app->pasco2_prescaler = 0;
+
+
+	/**
+	 * DPS310
+	 */
+	if (app->dps310_prescaler == 0)
 	{
 		if (app->sensor_fusion_available)
 		{
@@ -397,7 +455,15 @@ void rutronik_application_do(rutronik_application_t* app)
 			}
 		}
 	}
-	else if (app->prescaler == 7)
+	// 1 Hz prescaler (100 Hz / 100 = 1 Hz)
+	app->dps310_prescaler++;
+	if (app->dps310_prescaler >= 100) app->dps310_prescaler = 0;
+
+
+	/**
+	 * BMI270
+	 */
+	if (app->bmi270_prescaler == 0)
 	{
 		if (app->sensor_fusion_available)
 		{
@@ -414,7 +480,15 @@ void rutronik_application_do(rutronik_application_t* app)
 			}
 		}
 	}
-	else if (app->prescaler == 8)
+	// 10 Hz prescaler (100 Hz / 10 = 10 Hz)
+	app->bmi270_prescaler++;
+	if (app->bmi270_prescaler >= 10) app->bmi270_prescaler = 0;
+
+
+	/**
+	 * BME688
+	 */
+	if (app->bme688_prescaler == 0)
 	{
 #ifdef BME688_SUPPORT
 		if (app->sensor_fusion_available)
@@ -429,8 +503,9 @@ void rutronik_application_do(rutronik_application_t* app)
 		}
 #endif
 	}
-
-	app->prescaler = app->prescaler - 1;
+	// 5 Hz prescaler (100 Hz / 20 = 5 Hz)
+	app->bme688_prescaler++;
+	if (app->bme688_prescaler >= 20) app->bme688_prescaler = 0;
 
 #ifdef AMS_TMF_SUPPORT
 	/**
@@ -458,7 +533,11 @@ void rutronik_application_do(rutronik_application_t* app)
 #ifdef UM980_SUPPORT
 	if (app->um980_available != 0)
 	{
-		um980_app_do();
+		if (um980_app_do() != 0)
+		{
+			um980_app_reset();
+		}
+
 		if (um980_packet_available != 0)
 		{
 			um980_packet_available = 0;

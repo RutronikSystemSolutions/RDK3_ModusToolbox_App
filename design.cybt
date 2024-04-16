@@ -143,7 +143,7 @@
                                         <Field>
                                             <FieldProperties>
                                                 <Property id="Name" value="Software Revision"/>
-                                                <Property id="Value" value="1.1"/>
+                                                <Property id="Value" value="1.2"/>
                                                 <Property id="Format" value="f_utf8s"/>
                                                 <Property id="ByteLength" value="3"/>
                                             </FieldProperties>
@@ -299,9 +299,9 @@
     </Profiles>
     <GAP>
         <General>
-            <Property id="DeviceAddress" value="00A050-AABBFF"/>
+            <Property id="DeviceAddress" value="00A050-XXXXXX"/>
             <Property id="SiliconGeneratedAddress" value="false"/>
-            <Property id="MacGeneratedAddress" value="false"/>
+            <Property id="MacGeneratedAddress" value="true"/>
             <Property id="DeviceName" value="RDK3_Universal"/>
             <Property id="Appearance" value="0"/>
             <Property id="TxPowerLevelAdvScan" value="Pos_4"/>

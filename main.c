@@ -66,8 +66,16 @@
 #include "notification_fabric.h"
 #include "rutronik_application.h"
 
+/**
+ * Watchdog timer
+ * Timeout of 4 seconds
+ * If the software does not trigger the WDT during this timeout, then a restart happens
+ */
+#define WDT_TIMEOUT_MS	4000
+
 static cyhal_timer_t sensor_timer;
 static uint8_t timer_interrupt = 0;
+static cyhal_wdt_t watchdog;
 
 static void sensor_timer_isr(void *callback_arg, cyhal_timer_event_t event)
 {
@@ -110,6 +118,11 @@ static cy_rslt_t sensor_timer_init(void)
 	return result;
 }
 
+static void init_watchdog()
+{
+	cyhal_wdt_init(&watchdog, WDT_TIMEOUT_MS);
+}
+
 int main(void)
 {
     cy_rslt_t result;
@@ -136,7 +149,7 @@ int main(void)
     }
 
     printf("------------------------- \r\n");
-    printf("Starting RDK3 application \r\n");
+    printf("Starting RDK3 application v1.2 \r\n");
     printf("Enabling control over Smartphone App \r\n");
     printf("------------------------- \r\n");
 
@@ -178,6 +191,8 @@ int main(void)
 
     Ble_Init(&rutronik_app);
 
+    init_watchdog();
+
     uint32_t counter = 0;
 
     for (;;)
@@ -195,9 +210,9 @@ int main(void)
     		counter++;
     	}
 
-
-
     	host_main_do();
+
+    	cyhal_wdt_kick(&watchdog);
     }
 }
 

@@ -160,22 +160,17 @@ void SendAnswerNotification(uint16_t len, uint8_t* content);
 
 int host_main_add_notification(notification_t* notification)
 {
-	if(app.notification_enabled == 0) return -1;
-	if (app.mode != BLE_MODE_PUSH_DATA) return -1;
+	// Add to the list?
+	if ((app.notification_enabled == 0) || (app.mode != BLE_MODE_PUSH_DATA))
+	{
+		notification_fabric_free_notification(notification);
+		return -1;
+	}
 
 	// Add to the list
 	linked_list_add_element(&app.notification_list, (void*)notification);
 	return 0;
 }
-
-int host_main_is_ready_for_notification()
-{
-	if(app.notification_enabled == 0) return 0;
-	if (app.mode != BLE_MODE_PUSH_DATA) return 0;
-	return 1;
-}
-
-
 
 int host_main_do()
 {
@@ -199,10 +194,14 @@ int host_main_do()
     	switch(command)
     	{
 			case CMD_GET_AVAILABLE_SENSORS:
+			{
+				uint32_t sensor_mask = rutronik_application_get_available_sensors_mask(app.rutronik_app);
 				app.ack_to_send = 1;
 				app.ack_len = 4;
-				*((uint32_t *)app.ack_content) = rutronik_application_get_available_sensors_mask(app.rutronik_app);
+				*((uint32_t *)app.ack_content) = sensor_mask;
+				DEBUG_BLE_LOGIC("Sensor mask: %lu \r\n", sensor_mask);
 				break;
+			}
 
 			case CMD_START_PUSH_MODE:
 				app.ack_to_send = 1;
@@ -394,18 +393,7 @@ void StackEventHandler(uint32 event, void* eventParam)
         /* This event is received when the BLE component is Started */
         case CY_BLE_EVT_STACK_ON:
         {
-            DEBUG_BLE("CY_BLE_EVT_STACK_ON, Start Advertisement \r\n");    
-            
-            apiResult = Cy_BLE_GAP_SetBdAddress((cy_stc_ble_gap_bd_addr_t  *)&local_addr);
-            
-            if(apiResult != CY_BLE_SUCCESS)
-            {   
-                DEBUG_BLE("Cy_BLE_GAP_SetBdAddress API Error: %d \r\n",
-                    apiResult);
-            }
-                        
-             DEBUG_BLE("CUSTOM_SERV0_CHAR0_DESC0_HANDLE (%d)""\r\nCUSTOM_SERV0_CHAR0_HANDLE(%d)\r\n",CUSTOM_DESCR_HANDLE, CUSTOM_CHAR_HANDLE);
-            
+            DEBUG_BLE("CY_BLE_EVT_STACK_ON, Start Advertisement \r\n");
             /* Enter into discoverable mode so that remote device can search it */
             Cy_BLE_GAPP_StartAdvertisement(CY_BLE_ADVERTISING_FAST, CY_BLE_PERIPHERAL_CONFIGURATION_0_INDEX);
             
@@ -731,9 +719,8 @@ void StackEventHandler(uint32 event, void* eventParam)
             attr_param.handleValuePair = write_req_param->handleValPair;
             attr_param.offset = 0;
             
-            DEBUG_BLE("write_req_param->handleValPair.attrHandle = %d",\
-                write_req_param->handleValPair.attrHandle);
-            DEBUG_BLE(" -> Should be = CUSTOM_SERV0_CHAR0_DESC0_HANDLE (%d)\r\n-> Should be = CUSTOM_SERV0_CHAR0_HANDLE(%d)\r\n",CUSTOM_DESCR_HANDLE, CUSTOM_CHAR_HANDLE);
+            DEBUG_BLE("write_req_param->handleValPair.attrHandle = %d  \r\n", write_req_param->handleValPair.attrHandle);
+            DEBUG_BLE("CUSTOM_DESCR_HANDLE (%d)\r\n CUSTOM_CHAR_HANDLE(%d)\r\n",CUSTOM_DESCR_HANDLE, CUSTOM_CHAR_HANDLE);
                   
            
 			if(write_req_param->handleValPair.attrHandle == (CUSTOM_DESCR_HANDLE))
@@ -790,7 +777,7 @@ void StackEventHandler(uint32 event, void* eventParam)
 			}
 			else
 			{
-				DEBUG_BLE_LOGIC("Not correct is %d but should be %d \r\n", write_req_param->handleValPair.attrHandle, CUSTOM_DESCR_HANDLE);
+				DEBUG_BLE_LOGIC("Not correct is %d but should be %d or %d \r\n", write_req_param->handleValPair.attrHandle, CUSTOM_DESCR_HANDLE, CUSTOM_CHAR_HANDLE);
 			}
             break;
         }
