@@ -111,7 +111,7 @@ DEFINES=AMS_TMF_SUPPORT BME688_SUPPORT UM980_SUPPORT
 VFP_SELECT=
 
 # Set optimisation to size (if not, cannot have AMS and BME688 at the same time)
-CFLAGS=# -Os
+CFLAGS=-Os
 
 # Additional / custom C++ compiler flags.
 #
