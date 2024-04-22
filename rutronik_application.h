@@ -30,7 +30,15 @@ typedef struct
 	scd41_app_t scd41_app;
 	pasco2_app_t pasco2_app;
 
-	uint16_t prescaler;
+	uint16_t sht4x_prescaler;
+	uint16_t sgp40_prescaler;
+	uint16_t bmp581_prescaler;
+	uint16_t scd41_prescaler;
+	uint16_t battery_prescaler;
+	uint16_t pasco2_prescaler;
+	uint16_t dps310_prescaler;
+	uint16_t bmi270_prescaler;
+	uint16_t bme688_prescaler;
 
 #ifdef BME688_SUPPORT
 	bme688_app_t bme688_app;
