@@ -43,12 +43,12 @@ BSP_DEFINES:=CY_USING_HAL
 
 ifeq ($(SECURE_BOOT_STAGE),single)
 BSP_LINKER_SUFFIX=
-CY_SECURE_POLICY_NAME?=policy_single_CM0_CM4
+CY_SECURE_POLICY_NAME?=policy_single_CM0_CM4_smif
 else
 # In multi-boot, we want the "single" linker script for CM4 because that only links
 # in the CM4 image, allowing the CM0 image to be loaded separately.
 BSP_LINKER_SUFFIX=$(if $(call mtb_equals,$(MTB_RECIPE__CORE),CM4), _single,)
-CY_SECURE_POLICY_NAME?=policy_multi_CM0_CM4
+CY_SECURE_POLICY_NAME?=policy_single_CM0_CM4_smif
 endif
 
 # Specify the path to the linker script to use
