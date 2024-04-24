@@ -1,16 +1,13 @@
 /******************************************************************************
 * File Name:   main.c
 *
-* Description: This is the source code for the RDK3 Throughput Measurement
-*              Server Application for ModusToolbox.
+* Description: This is the source code for the RDK3 ModusToolbox Application
+* for iOS and Android OS smartphone connectivity.
 *
 * Related Document: See README.md
 *
-*
 *  Created on: 2022-12-21
-*  Company: Rutronik Elektronische Bauelemente GmbH
-*  Address: Jonavos g. 30, Kaunas 44262, Lithuania
-*  Author: GDR
+*  Author: ROJ030, GDR
 *
 *******************************************************************************
 * (c) 2019-2021, Cypress Semiconductor Corporation. All rights reserved.
@@ -55,7 +52,6 @@
 #include "cyhal.h"
 #include "cybsp.h"
 #include "cy_retarget_io.h"
-
 
 #include "hal/hal_i2c.h"
 #include "hal/hal_sleep.h"
