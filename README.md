@@ -9,9 +9,12 @@ Example with the iOS app:
 
 ## Requirements
 
-- [ModusToolbox™ software](https://www.infineon.com/cms/en/design-support/tools/sdk/modustoolbox-software/) v3.x
+- [ModusToolbox® software](https://www.infineon.com/cms/en/design-support/tools/sdk/modustoolbox-software/) **v3.x** [built with **v3.1**]
 - [RDK3](https://www.rutronik24.com/product/rutronik/rdk3/20820185.html)
 
+## Supported toolchains (make variable 'TOOLCHAIN')
+
+- GNU Arm&reg; Embedded Compiler v11.3.1 (`GCC_ARM`) - Default value of `TOOLCHAIN`
 
 ## Documentation
 
@@ -61,11 +64,11 @@ To add a new board / you will first have to add the driver for it. Since the RDK
 See the file Makefile. Remove AMS_TMF_SUPPORT for example to free some space.
     
     # Add additional defines to the build process (without a leading -D).
-	# Possible defines: 
-	# AMS_TMF_SUPPORT => To enable the support of the time of flight board
-	# BME688_SUPPORT => To enable the support of the BME688 sensor 
-	# UM980_SUPPORT => To enable the support of the UM980 sensor
-	DEFINES=AMS_TMF_SUPPORT BME688_SUPPORT UM980_SUPPORT
+    # Possible defines: 
+    # AMS_TMF_SUPPORT => To enable the support of the time of flight board
+    # BME688_SUPPORT => To enable the support of the BME688 sensor 
+    # UM980_SUPPORT => To enable the support of the UM980 sensor
+    DEFINES=AMS_TMF_SUPPORT BME688_SUPPORT UM980_SUPPORT
 
 Inside the file rutronik_application.c, you will have to implement the logic (how to init and read the data of the sensor).
 
