@@ -61,6 +61,7 @@
 #include "host_main.h"
 #include "notification_fabric.h"
 #include "rutronik_application.h"
+#include "battery_booster.h"
 
 /**
  * Watchdog timer
@@ -170,7 +171,6 @@ int main(void)
     res = sensor_timer_init();
     printf("sensor timer init retval: %d \r\n", res);
 
-
     /*Charger control*/
     result = cyhal_gpio_init(CHR_DIS, CYHAL_GPIO_DIR_OUTPUT, CYHAL_GPIO_DRIVE_STRONG, false);
     if (result != CY_RSLT_SUCCESS)
@@ -182,6 +182,12 @@ int main(void)
     if (result != CY_RSLT_SUCCESS)
     {CY_ASSERT(0);}
 
+    /* Li-ION/Li-Po battery Booster Initialisation */
+    if(!batt_boost_ctrl_init())
+    {
+    	printf("Battery power supply failure.\r\n");
+    	CY_ASSERT(0);
+    }
 
     rutronik_application_init(&rutronik_app);
 

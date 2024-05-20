@@ -84,7 +84,7 @@ Inside the file rutronik_application.c, you will have to implement the logic (ho
 
 Inside the file notification_fabric.c, you will have to define how the data that have to be send over Bluetooth LE looks like. Choose a new sensor id to avoid collision with already implemented sensors.
 
-## Comissioning
+## Commissioning
 ### The Provisioning of the RDK3
 
 The CYB06447BZI-BLD53 device must be provisioned with keys and policies before being programmed.
@@ -97,6 +97,35 @@ Please follow the instructions of the [user manual](https://github.com/RutronikS
 2. Select the directory where **"RDK3_ModusToolbox_App"** resides and click  **Finish**.
 3. Update the libraries using a **"Library Manager"** tool.
 4. Select and build the project **Project ** > **Build Project**.
+
+### Powering the RDK3 from the single-cell Li-ION/Li-PO battery
+
+The RAB3-Radar adapter board needs to be powered from a +5V power supply source via Arduino Headers. If the USB-C cable is connected with RDK3 and PC, the power is already supplied without any additional setup. 
+
+To make this demo portable and use it with Li-PO(or Li-ION) batteries, the OTG booster needs to be activated. This demo has a very simple method implemented which allows users to enable the boost mode from the batter just by pressing a button USER BTN1.
+
+- Connect the single-cell Li-PO or Li-ION battery, please respect the polarity. It would be best if the battery would have an internal protection circuit integrated.
+
+- Switch the SW3 upwards to the "BATTERY" position.
+
+- Mount the RAB3-Radar adapter board.
+
+- Press and hold the button USER_BTN1 and then press and release a RESET Button. Notice if the GREEN LED D7 - "POWER" lights up.
+
+- Release the USER_BTN1. The YELLOW blinking LED1 D8 indicates that the system is running and is ready for connection with a smartphone via Bluetooth LE. 
+
+  NOTICE 1: this demo does not have power-saving and self-shutting down algorithms implemented yet. The switch SW3 must be switched down to the +5V/KitProg position if the development kit is not used. This is especially important if you are using batteries without the protection circuits integrated (never allow for the voltage of the battery to fall below 3 volts).
+
+  NOTICE 2: The charging will not work if the boost mode is engaged. You need to restart the demo without pressing USER_BTN1.
+
+  NOTICE 3: The battery charging current may be adjusted in code in `battery_booster.c`:
+
+  ```c
+      	/*The charging current depends on your battery used*/
+      	dio_set_batt_current(CURR_VREF_101_8);
+  ```
+
+<img src="images/batt_supply.jpg" style="zoom:25%;" />
 
 ### Debugging
 
