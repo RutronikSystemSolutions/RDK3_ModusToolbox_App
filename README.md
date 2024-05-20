@@ -100,15 +100,15 @@ Please follow the instructions of the [user manual](https://github.com/RutronikS
 
 ### Powering the RDK3 from the single-cell Li-ION/Li-PO battery
 
-The RAB3-Radar adapter board needs to be powered from a +5V power supply source via Arduino Headers. If the USB-C cable is connected with RDK3 and PC, the power is already supplied without any additional setup. 
+The RAB4-RTK adapter board needs to be powered from a +5V power supply source via Arduino Headers. If the USB-C cable is connected with RDK3 and PC, the power is already supplied without any additional setup. 
 
-To make this demo portable and use it with Li-PO(or Li-ION) batteries, the OTG booster needs to be activated. This demo has a very simple method implemented which allows users to enable the boost mode from the batter just by pressing a button USER BTN1.
+To make this demo portable and use it with Li-PO(or Li-ION) batteries, the OTG booster needs to be activated. This demo has a very simple method implemented which allows users to enable the boost mode of the [DIO59020](https://www.dioo.com/uploads/product/20210520/9fdd66c936d397ab75a4638578b09190.pdf) charger just by pressing a button USER BTN1. The 
 
 - Connect the single-cell Li-PO or Li-ION battery, please respect the polarity. It would be best if the battery would have an internal protection circuit integrated.
 
 - Switch the SW3 upwards to the "BATTERY" position.
 
-- Mount the RAB3-Radar adapter board.
+- Mount the RAB4-RTK adapter board.
 
 - Press and hold the button USER_BTN1 and then press and release a RESET Button. Notice if the GREEN LED D7 - "POWER" lights up.
 
