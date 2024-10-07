@@ -30,6 +30,7 @@
 #include "dio59020/dio59020.h"
 #include "dps310/dps310_app.h"
 #include "bmi270/bmi270_app.h"
+#include "vcnl4030x01/vcnl4030x01.h"
 
 #include "host_main.h"
 
@@ -56,6 +57,8 @@ static void init_sensors_hal(rutronik_application_t* app)
 	hal_timer_init();
 	um980_app_init_hal(hal_uart_readable, hal_uart_read, hal_uart_write, hal_timer_get_uticks);
 #endif
+
+	vcnl4030x01_init_hal(hal_i2c_read_register, hal_i2c_write);
 }
 
 static int is_sensor_fusion_board_available()
@@ -89,6 +92,16 @@ static int is_um980_board_available()
 	return 1;
 }
 #endif
+
+static int is_vcnl4030x01_available()
+{
+	uint16_t id = 0;
+	if (vcnl4030x01_read_id(&id) != 0)
+	{
+		return 0;
+	}
+	return 1;
+}
 
 static int init_bmp581()
 {
@@ -238,6 +251,7 @@ void rutronik_application_init(rutronik_application_t* app)
 	app->co2_available = 0;
 	app->ams_tof_available = 0;
 	app->um980_available = 0;
+	app->vcnl4030x01_available = 0;
 
 	// Init prescalers
 	// 1 Hz prescalers -> shifted by 10ms (to avoid to many I2C read inside one loop)
@@ -248,6 +262,7 @@ void rutronik_application_init(rutronik_application_t* app)
 	app->battery_prescaler = 40;
 	app->pasco2_prescaler = 50;
 	app->dps310_prescaler = 60;
+	app->vcnl4030x01_prescaler = 70;
 
 	// 10 Hz
 	app->bmi270_prescaler = 0;
@@ -288,6 +303,12 @@ void rutronik_application_init(rutronik_application_t* app)
 		init_um980_board(app);
 	}
 #endif
+	if (is_vcnl4030x01_available() != 0)
+	{
+		app->vcnl4030x01_available = 1;
+		// Init measurement mode
+		vcnl4030x01_init();
+	}
 }
 
 uint32_t rutronik_application_get_available_sensors_mask(rutronik_application_t* app)
@@ -297,7 +318,8 @@ uint32_t rutronik_application_get_available_sensors_mask(rutronik_application_t*
 			| ((uint32_t) app->co2_available) << 1
 			| ((uint32_t) app->ams_tof_available) << 2
 			// << 3 is for radar board
-			| ((uint32_t) app->um980_available) << 4;
+			| ((uint32_t) app->um980_available) << 4
+			| ((uint32_t) app->vcnl4030x01_available) << 5;
 }
 
 #ifdef AMS_TMF_SUPPORT
@@ -546,5 +568,24 @@ void rutronik_application_do(rutronik_application_t* app)
 		}
 	}
 #endif
+
+	/**
+	 * VCNL30x01
+	 */
+	if (app->vcnl4030x01_prescaler == 0)
+	{
+		if (app->vcnl4030x01_available)
+		{
+			uint16_t proximity_value = 0;
+			if (vcnl4030x01_get_proximity_data(&proximity_value) == 0)
+			{
+				host_main_add_notification(
+						notification_fabric_create_for_vcnl4030x01(proximity_value, 0, 0));
+			}
+		}
+	}
+	// 2 Hz prescaler (100 Hz / 20 = 5 Hz)
+	app->vcnl4030x01_prescaler++;
+	if (app->vcnl4030x01_prescaler >= 20) app->vcnl4030x01_prescaler = 0;
 }
 

@@ -6,7 +6,9 @@
 *
 * Related Document: See README.md
 *
+*
 *  Created on: 2022-12-21
+*  Company: Rutronik Elektronische Bauelemente GmbH
 *  Author: ROJ030, GDR
 *
 *******************************************************************************
@@ -146,7 +148,7 @@ int main(void)
     }
 
     printf("------------------------- \r\n");
-    printf("Starting RDK3 application v1.2 \r\n");
+    printf("Starting RDK3 application v1.3 \r\n");
     printf("Enabling control over Smartphone App \r\n");
     printf("------------------------- \r\n");
 
