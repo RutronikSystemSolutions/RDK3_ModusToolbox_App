@@ -390,3 +390,29 @@ notification_t* notification_fabric_create_for_um980(um980_gga_packet_t* packet)
 	return retval;
 }
 #endif
+
+notification_t* notification_fabric_create_for_vcnl4030x01(uint16_t proximity_value, uint16_t als_value, uint16_t white_value)
+{
+	const uint8_t data_size = 3 * sizeof(uint16_t);
+	const uint8_t notification_size = data_size + notification_overhead;
+	const uint16_t sensor_id = 0xE;
+
+	uint8_t* data = (uint8_t*) malloc(notification_size);
+
+	data[0] = (uint8_t) (sensor_id & 0xFF);
+	data[1] = (uint8_t) (sensor_id >> 8);
+
+	data[2] = data_size;
+
+	*((uint16_t*) &data[3]) = proximity_value;
+	*((uint16_t*) &data[5]) = als_value;
+	*((uint16_t*) &data[7]) = white_value;
+
+	data[notification_size - 1] = compute_crc(data, notification_size - 1);
+
+	notification_t* retval = (notification_t*) malloc(sizeof(notification_t));
+	retval->length = notification_size;
+	retval->data = data;
+
+	return retval;
+}

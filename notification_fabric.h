@@ -51,4 +51,6 @@ notification_t* notification_fabric_create_for_bme688(bme688_scan_data_t * value
 notification_t* notification_fabric_create_for_um980(um980_gga_packet_t* packet);
 #endif
 
+notification_t* notification_fabric_create_for_vcnl4030x01(uint16_t proximity_value, uint16_t als_value, uint16_t white_value);
+
 #endif /* NOTIFICATION_FABRIC_H_ */

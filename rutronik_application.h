@@ -25,6 +25,7 @@ typedef struct
 	uint8_t co2_available;				/**< Store if the CO2 board is available (1) or not (0) */
 	uint8_t ams_tof_available;			/**< Store if the AMS OSRAM TOF board is available (1) or not (0) */
 	uint8_t um980_available;			/**< Store if the UM980 board is available (1) or not (0) */
+	uint8_t vcnl4030x01_available;		/**< Store if the VNCL30x01 board is available (1) or not (0) */
 
 	GasIndexAlgorithmParams gas_index_params;
 	scd41_app_t scd41_app;
@@ -39,6 +40,7 @@ typedef struct
 	uint16_t dps310_prescaler;
 	uint16_t bmi270_prescaler;
 	uint16_t bme688_prescaler;
+	uint16_t vcnl4030x01_prescaler;
 
 #ifdef BME688_SUPPORT
 	bme688_app_t bme688_app;
