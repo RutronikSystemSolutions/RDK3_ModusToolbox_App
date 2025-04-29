@@ -40,6 +40,18 @@ static void copy_configuration(bme688_measurement_configuration_t* src, bme688_m
 	dst->humidity_os = src->humidity_os;
 }
 
+int bme688_app_is_available()
+{
+	const uint8_t bme688_var_id = 0x01;
+	uint8_t variant_id = 0;
+	int rslt = bme688_get_variant_id(&variant_id);
+	if ((rslt == 0) && (variant_id == bme688_var_id))
+	{
+		return 1;
+	}
+	return 0;
+}
+
 int bme688_app_init_parallel_mode(bme688_app_t* app, bme688_measurement_configuration_t* configuration)
 {
 	const uint16_t ambient_temperature = 25;

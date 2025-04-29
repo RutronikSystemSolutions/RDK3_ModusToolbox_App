@@ -49,6 +49,14 @@ typedef struct
 } bme688_app_t;
 
 /**
+ * @brief Check if the BME688 is available or not
+ *
+ * @retval 0 Not available
+ * @retval 1 Available
+ */
+int bme688_app_is_available();
+
+/**
  * Initialize the BME688 in parallel mode
  */
 int bme688_app_init_parallel_mode(bme688_app_t* app, bme688_measurement_configuration_t* configuration);

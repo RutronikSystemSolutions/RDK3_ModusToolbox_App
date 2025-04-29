@@ -19,6 +19,25 @@
 #include "bme688/bme688_app.h"
 #endif
 
+/**
+ * @def RUTRONIK_APP_PERIOD_MS
+ * @brief Define the period at which the rutronik app function is called
+ */
+#define RUTRONIK_APP_PERIOD_MS	10
+
+#define SGP41_CONDITIONING_DURATION_MS	10000
+#define SGP41_CONDITIONING_PERIOD_MS	500
+#define SGP41_MEASUREMENT_PERIOD_MS		1000
+#define BMP585_MEASUREMENT_PERIOD_MS	100
+#define DPS368_MEASUREMENT_PERIOD_MS	250
+#define BMI323_MEASUREMENT_PERIOD_MS	100
+
+typedef enum
+{
+	SGP41_CONDITIONING,
+	SGP41_MEASUREMENT
+} sgp41_state_e;
+
 typedef struct
 {
 	uint8_t sensor_fusion_available;	/**< Store if the sensor fusion board is available (1) or not (0) */
@@ -26,8 +45,11 @@ typedef struct
 	uint8_t ams_tof_available;			/**< Store if the AMS OSRAM TOF board is available (1) or not (0) */
 	uint8_t um980_available;			/**< Store if the UM980 board is available (1) or not (0) */
 	uint8_t vcnl4030x01_available;		/**< Store if the VNCL30x01 board is available (1) or not (0) */
+	uint8_t rab7_available;
 
-	GasIndexAlgorithmParams gas_index_params;
+	GasIndexAlgorithmParams gas_index_voc_params;
+	GasIndexAlgorithmParams gas_index_nox_params;
+
 	scd41_app_t scd41_app;
 	pasco2_app_t pasco2_app;
 
@@ -42,11 +64,24 @@ typedef struct
 	uint16_t bme688_prescaler;
 	uint16_t vcnl4030x01_prescaler;
 
+	uint16_t bmm350_prescaler;
+
 #ifdef BME688_SUPPORT
 	bme688_app_t bme688_app;
 #endif
 
 	lowpassfilter_t filtered_voltage;
+
+	sgp41_state_e sgp41_state;
+	uint16_t sgp41_prescaler;
+
+	uint16_t bme690_prescaler;
+	uint16_t bmp585_prescaler;
+	uint16_t dps368_prescaler;
+	uint16_t bmi323_prescaler;
+
+	float sht4x_temperature;	/**< Store last temperature (used for SGP41 compensation) */
+	float sht4x_humidity;		/**< Store last humidity (used for SGP41 compensation) */
 
 } rutronik_application_t;
 

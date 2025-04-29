@@ -17,6 +17,8 @@
 #include "um980/gga_packet.h"
 #endif
 
+#include "bme690/bme690_app.h"
+
 typedef struct
 {
 	uint8_t length;
@@ -52,5 +54,17 @@ notification_t* notification_fabric_create_for_um980(um980_gga_packet_t* packet)
 #endif
 
 notification_t* notification_fabric_create_for_vcnl4030x01(uint16_t proximity_value, uint16_t als_value, uint16_t white_value);
+
+notification_t* notification_fabric_create_for_bmm350(float temp, float mag_x, float mag_y, float mag_z);
+
+notification_t* notification_fabric_create_for_sgp41(uint16_t voc_raw, uint16_t nox_raw, int32_t voc_index, int32_t nox_index);
+
+notification_t* notification_fabric_create_for_bme690(bme69x_data_t* bme_data);
+
+notification_t* notification_fabric_create_for_bmp585(float press, float temp);
+
+notification_t* notification_fabric_create_for_dps368(float press, float temp);
+
+notification_t* notification_fabric_create_for_bmi323(int16_t acc_x, int16_t acc_y, int16_t acc_z, int16_t gyr_x, int16_t gyr_y, int16_t gyr_z);
 
 #endif /* NOTIFICATION_FABRIC_H_ */

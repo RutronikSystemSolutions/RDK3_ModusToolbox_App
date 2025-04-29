@@ -32,7 +32,17 @@
 #include "bmi270/bmi270_app.h"
 #include "vcnl4030x01/vcnl4030x01.h"
 
+#include "bmm350/bmm350_app.h"
+#include "sgp41/sgp41.h"
+#include "bme690/bme690_app.h"
+#include "bmp585/bmp585_app.h"
+#include "dps368/dps368_app.h"
+#include "bmi323/bmi323_app.h"
+
 #include "host_main.h"
+
+// TODO remove me
+#include <stdio.h>
 
 static void init_sensors_hal(rutronik_application_t* app)
 {
@@ -59,19 +69,14 @@ static void init_sensors_hal(rutronik_application_t* app)
 #endif
 
 	vcnl4030x01_init_hal(hal_i2c_read_register, hal_i2c_write);
+
+	sgp41_init(hal_i2c_read, hal_i2c_write, hal_sleep);
 }
 
 static int is_sensor_fusion_board_available()
 {
-	uint32_t id = 0;
-	int result = sht4x_get_serial_id(&id);
-	if (result != 0)
-	{
-		// Not available
-		return 0;
-	}
-	// Available
-	return 1;
+	if (bme688_app_is_available() == 1) return 1;
+	return 0;
 }
 
 static int is_co2_board_available()
@@ -103,6 +108,12 @@ static int is_vcnl4030x01_available()
 	return 1;
 }
 
+static int is_rab7_available()
+{
+	if (bmm350_app_is_available() != 1) return 0;
+	return 1;
+}
+
 static int init_bmp581()
 {
 	/*Initialize the BMP581 Sensor*/
@@ -122,7 +133,7 @@ static int init_bmp581()
 static int init_sgp40(rutronik_application_t* app)
 {
 	// Initialize algorithm for VOC type
-	GasIndexAlgorithm_init(&app->gas_index_params, GasIndexAlgorithm_ALGORITHM_TYPE_VOC);
+	GasIndexAlgorithm_init(&(app->gas_index_voc_params), GasIndexAlgorithm_ALGORITHM_TYPE_VOC);
 
 	return 0;
 }
@@ -244,6 +255,52 @@ static void init_um980_board(rutronik_application_t* app)
 }
 #endif
 
+static void init_sgp41(rutronik_application_t* app)
+{
+	// Initialize algorithm for VOC type
+	GasIndexAlgorithm_init(&(app->gas_index_voc_params), GasIndexAlgorithm_ALGORITHM_TYPE_VOC);
+	GasIndexAlgorithm_init(&(app->gas_index_nox_params), GasIndexAlgorithm_ALGORITHM_TYPE_NOX);
+}
+
+static void init_rab7(rutronik_application_t* app)
+{
+	if (bmm350_app_init() != 0)
+	{
+		printf("bmm350_app_init error\r\n");
+		app->rab7_available = 0;
+		return;
+	}
+
+	if (bme690_app_init() != 0)
+	{
+		printf("bme690_app_init error\r\n");
+		app->rab7_available = 0;
+		return;
+	}
+
+	if (bmp585_app_init() != 0)
+	{
+		printf("bmp585_app_init error\r\n");
+		app->rab7_available = 0;
+		return;
+	}
+
+	if (dps368_app_init() != 0)
+	{
+		printf("dps368_app_init error\r\n");
+		app->rab7_available = 0;
+		return;
+	}
+
+	if (bmi323_app_init() != 0)
+	{
+		printf("bmi323_app_init error\r\n");
+		app->rab7_available = 0;
+		return;
+	}
+
+	init_sgp41(app);
+}
 
 void rutronik_application_init(rutronik_application_t* app)
 {
@@ -252,6 +309,13 @@ void rutronik_application_init(rutronik_application_t* app)
 	app->ams_tof_available = 0;
 	app->um980_available = 0;
 	app->vcnl4030x01_available = 0;
+	app->rab7_available = 0;
+
+	app->sgp41_state = SGP41_CONDITIONING;
+	app->sgp41_prescaler = 0;
+	app->bme690_prescaler = 0;
+	app->bmp585_prescaler = 0;
+	app->dps368_prescaler = 0;
 
 	// Init prescalers
 	// 1 Hz prescalers -> shifted by 10ms (to avoid to many I2C read inside one loop)
@@ -263,6 +327,8 @@ void rutronik_application_init(rutronik_application_t* app)
 	app->pasco2_prescaler = 50;
 	app->dps310_prescaler = 60;
 	app->vcnl4030x01_prescaler = 70;
+	app->bmm350_prescaler =  0;
+	app->bmi323_prescaler = 0;
 
 	// 10 Hz
 	app->bmi270_prescaler = 0;
@@ -309,6 +375,14 @@ void rutronik_application_init(rutronik_application_t* app)
 		// Init measurement mode
 		vcnl4030x01_init();
 	}
+
+	if (is_rab7_available() != 0)
+	{
+		// TODO
+		printf("RAB7 available!\r\n");
+		app->rab7_available = 1;
+		init_rab7(app);
+	}
 }
 
 uint32_t rutronik_application_get_available_sensors_mask(rutronik_application_t* app)
@@ -319,7 +393,8 @@ uint32_t rutronik_application_get_available_sensors_mask(rutronik_application_t*
 			| ((uint32_t) app->ams_tof_available) << 2
 			// << 3 is for radar board
 			| ((uint32_t) app->um980_available) << 4
-			| ((uint32_t) app->vcnl4030x01_available) << 5;
+			| ((uint32_t) app->vcnl4030x01_available) << 5
+			| ((uint32_t) app->rab7_available) << 6;
 }
 
 #ifdef AMS_TMF_SUPPORT
@@ -336,7 +411,7 @@ static int measure_sgp40_values(rutronik_application_t* app, float temperature, 
 	if (sgp40_measure_raw_signal_without_compensation(voc_value_raw) != 0) return -1;
 	if (sgp40_measure_with_compensation(temperature, humidity, voc_value_compensated) != 0) return -2;
 
-	GasIndexAlgorithm_process(&app->gas_index_params, *voc_value_compensated, gas_index);
+	GasIndexAlgorithm_process(&app->gas_index_voc_params, *voc_value_compensated, gas_index);
 
 	return 0;
 }
@@ -351,13 +426,11 @@ void rutronik_application_do(rutronik_application_t* app)
 	 */
 	if (app->sht4x_prescaler == 0)
 	{
-		if (app->sensor_fusion_available != 0)
+		if ((app->sensor_fusion_available != 0)
+				|| (app->rab7_available != 0))
 		{
-			float temperature = 0;
-			float humidity = 0;
-
-			if (sht4x_get_temperature_and_humidity(&temperature, &humidity) == 0)
-				host_main_add_notification(notification_fabric_create_for_sht4x(temperature, humidity));
+			if (sht4x_get_temperature_and_humidity(&(app->sht4x_temperature), &(app->sht4x_humidity)) == 0)
+				host_main_add_notification(notification_fabric_create_for_sht4x(app->sht4x_temperature, app->sht4x_humidity));
 		}
 	}
 	// 1 Hz prescaler (100 Hz / 100 = 1 Hz)
@@ -587,5 +660,206 @@ void rutronik_application_do(rutronik_application_t* app)
 	// 2 Hz prescaler (100 Hz / 20 = 5 Hz)
 	app->vcnl4030x01_prescaler++;
 	if (app->vcnl4030x01_prescaler >= 20) app->vcnl4030x01_prescaler = 0;
+
+	/**
+	 * BMM350
+	 */
+	if (app->rab7_available)
+	{
+		if (app->bmm350_prescaler == 0)
+		{
+			float mag_temp = 0;
+			float mag_x = 0;
+			float mag_y = 0;
+			float mag_z = 0;
+			int8_t bmm350_ret = 0;
+
+			// Try to read the BMM350 sensor
+			bmm350_ret = bmm350_app_read_data(&mag_temp, &mag_x, &mag_y, &mag_z);
+			if (bmm350_ret == 0)
+			{
+				host_main_add_notification(
+						notification_fabric_create_for_bmm350(mag_temp, mag_x, mag_y, mag_z));
+			}
+		}
+		// 100 Hz / 10 -> 10Hz
+		app->bmm350_prescaler++;
+		if (app->bmm350_prescaler >= 10) app->bmm350_prescaler = 0;
+	}
+
+	/**
+	 * SGP41
+	 */
+	if (app->rab7_available)
+	{
+		if (app->sgp41_state == SGP41_CONDITIONING)
+		{
+			if (app->sgp41_prescaler >= (SGP41_CONDITIONING_DURATION_MS / RUTRONIK_APP_PERIOD_MS))
+			{
+				app->sgp41_prescaler = 0;
+				app->sgp41_state = SGP41_MEASUREMENT;
+			}
+			else if ((app->sgp41_prescaler % (SGP41_CONDITIONING_PERIOD_MS / RUTRONIK_APP_PERIOD_MS)) == 0)
+			{
+				// Call to conditioning
+				sgp41_conditioning_cmd(SGP41_DEFAULT_RH, SGP41_DEFAULT_T);
+				app->sgp41_prescaler++;
+			}
+			else
+			{
+				app->sgp41_prescaler++;
+			}
+		}
+		else if (app->sgp41_state == SGP41_MEASUREMENT)
+		{
+			if (app->sgp41_prescaler == 0)
+			{
+				uint16_t sgp_sraw_voc = 0;
+				uint16_t sgp_sraw_nox = 0;
+				int32_t sgp_voc_index = 0;
+				int32_t sgp_nox_index = 0;
+
+				/*Read the data and send a new command to start measurement*/
+				sgp41_read_raw_cmd(&sgp_sraw_voc, &sgp_sraw_nox);
+				uint16 comp_rh = (uint16_t)app->sht4x_humidity * 65535 / 100;
+				uint16_t comp_t = (uint16_t)(app->sht4x_temperature + 45) * 65535 / 175;
+				sgp41_measure_raw_cmd(comp_rh, comp_t); /*Do the measurements with a temperature and humidity acquired from SHT4x*/
+				GasIndexAlgorithm_process(&app->gas_index_voc_params, sgp_sraw_voc, &sgp_voc_index);
+				GasIndexAlgorithm_process(&app->gas_index_nox_params, sgp_sraw_nox, &sgp_nox_index);
+
+				host_main_add_notification(
+						notification_fabric_create_for_sgp41(sgp_sraw_voc, sgp_sraw_nox, sgp_voc_index, sgp_nox_index));
+			}
+
+			app->sgp41_prescaler++;
+			if (app->sgp41_prescaler >= (SGP41_MEASUREMENT_PERIOD_MS / RUTRONIK_APP_PERIOD_MS))
+				app->sgp41_prescaler = 0;
+		}
+	}
+
+	/**
+	 * BME690
+	 */
+	if (app->rab7_available)
+	{
+		if (app->bme690_prescaler == 0)
+		{
+			int8_t bme690_result = 0;
+			uint8_t fields_cnt = 0;
+			bme69x_data_t data = {0};
+
+			bme690_result = bme690_data_available(&fields_cnt);
+			if(bme690_result == 0)
+			{
+		        for (uint8_t i = 0; i < fields_cnt; i++)
+		        {
+		        	if(bme690_data_read(&data, i))
+		        	{
+		        		host_main_add_notification(notification_fabric_create_for_bme690(&data));
+		        	}
+		        }
+			}
+
+		}
+		app->bme690_prescaler++;
+		if (app->bme690_prescaler >= (bme690_app_get_measurement_period() / RUTRONIK_APP_PERIOD_MS))
+			app->bme690_prescaler = 0;
+	}
+
+	/**
+	 * BMP585
+	 */
+	if (app->rab7_available)
+	{
+		if (app->bmp585_prescaler == 0)
+		{
+			float pressure = 0;
+			float temperature = 0;
+			int8_t bmp585_retval = 0;
+
+			bmp585_retval = bmp585_read_data(&temperature, &pressure);
+			if(bmp585_retval == 0)
+			{
+				host_main_add_notification(notification_fabric_create_for_bmp585(pressure, temperature));
+			}
+
+		}
+		app->bmp585_prescaler++;
+		if (app->bmp585_prescaler >= (BMP585_MEASUREMENT_PERIOD_MS / RUTRONIK_APP_PERIOD_MS))
+			app->bmp585_prescaler = 0;
+	}
+
+	/**
+	 * DPS368
+	 */
+	if (app->rab7_available)
+	{
+		if (app->dps368_prescaler == 0)
+		{
+			float pressure = 0;
+			float temperature = 0;
+			int8_t dps368_retval = 0;
+
+			dps368_retval = dps368_read_data(&temperature, &pressure);
+			if(dps368_retval == 0)
+			{
+				// convert to Pa (currently in hPa)
+				pressure = pressure * 100.f;
+				host_main_add_notification(notification_fabric_create_for_dps368(pressure, temperature));
+			}
+		}
+		app->dps368_prescaler++;
+		if (app->dps368_prescaler >= (DPS368_MEASUREMENT_PERIOD_MS / RUTRONIK_APP_PERIOD_MS))
+			app->dps368_prescaler = 0;
+
+	}
+
+	/**
+	 * BMI323
+	 */
+	if (app->rab7_available)
+	{
+		if (app->bmi323_prescaler == 0)
+		{
+			int16_t acc_x = 0;
+			int16_t acc_y = 0;
+			int16_t acc_z = 0;
+			int16_t gyr_x = 0;
+			int16_t gyr_y = 0;
+			int16_t gyr_z = 0;
+			_Bool acc_ready = 0;
+			_Bool gyr_ready = 0;
+
+			int8_t bmi323_retval = 0;
+
+			// Check if sensors are ready
+			bmi323_retval = bmi323_int_status(&acc_ready, &gyr_ready);
+			if(bmi323_retval == 0)
+			{
+				if( (acc_ready) && (gyr_ready))
+				{
+					if (bmi323_read_acc_data(&acc_x, &acc_y, &acc_z) != 0)
+					{
+						acc_x = 1;
+						acc_y = 2;
+						acc_z = 3;
+					}
+					if (bmi323_read_gyr_data(&gyr_x, &gyr_y, &gyr_z) != 0)
+					{
+						gyr_x = 4;
+						gyr_y = 5;
+						gyr_z = 6;
+					}
+
+					host_main_add_notification(
+							notification_fabric_create_for_bmi323(acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z));
+
+				}
+			}
+		}
+		app->bmi323_prescaler++;
+		if (app->bmi323_prescaler >= (BMI323_MEASUREMENT_PERIOD_MS / RUTRONIK_APP_PERIOD_MS))
+			app->bmi323_prescaler = 0;
+	}
 }
 
