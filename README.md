@@ -6,17 +6,16 @@ Example with the iOS app:
 <p>
 <img src="images/tmf8828_values.PNG" height="400">
 </p>
+## **NOTICE**
+
+**Infineon has discontinued the PSOC™ 64 Secured MCU product line. As a result, the CYB06447BZI-BLD53 MCU used in the RDK3 is not recommended for new designs. The Infineon CY8C6347BZI-BLD53 MCU may be considered a suitable alternative.**
 
 ## Requirements
 
-- [ModusToolbox® software](https://www.infineon.com/cms/en/design-support/tools/sdk/modustoolbox-software/) **v3.x** [built with **v3.1**]
+- [ModusToolbox® software](https://www.infineon.com/cms/en/design-support/tools/sdk/modustoolbox-software/) **v2025.4.0** [built with **v3.1**]
 - [RDK3](https://www.rutronik24.com/product/rutronik/rdk3/20820185.html)
 
-- [ModusToolbox® software](https://www.infineon.com/cms/en/design-support/tools/sdk/modustoolbox-software/) **v3.2**: 
-
-1. The [Python](https://www.python.org/) has to be installed manually on Windows OS.
-2. Make sure the Python installation is added to the path variable. 
-3. Use this command to install the [cysecuretools](https://pypi.org/project/cysecuretools/) package:
+- The [Python](https://www.python.org/) has to be installed manually on Windows OS. Make sure the Python installation is added to the path variable. Use this command to install the [cysecuretools](https://pypi.org/project/cysecuretools/) package:
 
 ```
 pip install cysecuretools
@@ -91,6 +90,8 @@ The CYB06447BZI-BLD53 device must be provisioned with keys and policies before b
 
 Please follow the instructions of the [user manual](https://github.com/RutronikSystemSolutions/RDK3_Documents/blob/main/RDK3_user's_manual.pdf).
 
+The default keys and policies also might be downloaded from here: [RDK3 RUTRONIK DEMO KEYS](https://github.com/RutronikSystemSolutions/RDK3_Documents/tree/main/RDK3%20RUTRONIK%20DEMO%20Keys)
+
 ### Using the code example with a ModusToolbox™ IDE:
 
 1. Import the project: **File** > **Import...** > **General** > **Existing Projects into Workspace** > **Next**.
@@ -110,11 +111,11 @@ To make this demo portable and use it with Li-PO(or Li-ION) batteries, the OTG b
 
 - Mount the RAB4-RTK adapter board.
 
-- Press and hold the button USER_BTN1 and then press and release a RESET Button. Notice if the GREEN LED D7 - "POWER" lights up.
+- Press and hold the button USER_BTN1 and then press and release the RESET Button. Notice if the GREEN LED D7 - "POWER" lights up.
 
 - Release the USER_BTN1. The YELLOW blinking LED1 D8 indicates that the system is running and is ready for connection with a smartphone via Bluetooth LE. 
 
-  NOTICE 1: this demo does not have power-saving and self-shutting down algorithms implemented yet. The switch SW3 must be switched down to the +5V/KitProg position if the development kit is not used. This is especially important if you are using batteries without the protection circuits integrated (never allow for the voltage of the battery to fall below 3 volts).
+  NOTICE 1: This demo does not have power-saving and self-shutting down algorithms implemented yet. The switch SW3 must be switched down to the +5V/KitProg position if the development kit is not used. This is especially important if you are using batteries without the protection circuits integrated (never allow for the voltage of the battery to fall below 3 volts).
 
   NOTICE 2: The charging will not work if the boost mode is engaged. You need to restart the demo without pressing USER_BTN1.
 
@@ -129,7 +130,7 @@ To make this demo portable and use it with Li-PO(or Li-ION) batteries, the OTG b
 
 ### Debugging
 
-If you successfully have imported the example, the debug configurations are already prepared to use with a the KitProg3, MiniProg4, or J-link. Open the ModusToolbox™ perspective and find the Quick Panel. Click on the desired debug launch configuration and wait for the programming to complete and the debugging process to start.
+If you have successfully imported the example, the debug configurations are already prepared to use with the KitProg3, MiniProg4. Open the ModusToolbox™ perspective and find the Quick Panel. Click on the desired debug launch configuration and wait for the programming to complete and the debugging process to start.
 
 <img src="images/debug_start.png" style="zoom:100%;" />
 
