@@ -6,9 +6,30 @@ Example with the iOS app:
 <p>
 <img src="images/tmf8828_values.PNG" height="400">
 </p>
+
 ## **NOTICE**
 
 **Infineon has discontinued the PSOC™ 64 Secured MCU product line. As a result, the CYB06447BZI-BLD53 MCU used in the RDK3 is not recommended for new designs. The Infineon CY8C6347BZI-BLD53 MCU may be considered a suitable alternative.**
+
+## I cannot open the connection with my RDK3, what should I do?
+
+#### Check the power supply
+Is the power LED lighting? If no, you have a power supply problem.
+
+#### Check the software running on the RDK3
+Plug the RDK3 to your computer and open a terminal (RealTerm for example). Change
+the baud rate to 115200 and press the “Reset” switch of the RDK3. You should see
+following message in the Terminal:
+```
+Starting RDK3 application v1.X
+Enabling control over Smartphone App
+```
+
+#### Disable/Enable Bluetooth
+Close the app (double click on “home” button). Disable Bluetooth. Then enable Bluetooth again and start the app.
+You need to disable the Bluetooth in the settings of your iPhone (not in the quick menu).
+
+<img src="images/disable_enable_ble_iphone.png">
 
 ## Requirements
 
