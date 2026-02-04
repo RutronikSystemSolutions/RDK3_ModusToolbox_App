@@ -148,7 +148,7 @@ int main(void)
     }
 
     printf("------------------------- \r\n");
-    printf("Starting RDK3 application v1.4 \r\n");
+    printf("Starting RDK3 application v1.5 \r\n");
     printf("Enabling control over Smartphone App \r\n");
     printf("------------------------- \r\n");
 

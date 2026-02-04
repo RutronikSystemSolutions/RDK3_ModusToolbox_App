@@ -541,8 +541,9 @@ void StackEventHandler(uint32 event, void* eventParam)
             phyParam.bdHandle = appConnHandle.bdHandle;
             phyParam.allPhyMask = CY_BLE_PHY_NO_PREF_MASK_NONE;
             phyParam.phyOption = 0;
-            phyParam.rxPhyMask = CY_BLE_PHY_MASK_LE_2M;
-            phyParam.txPhyMask = CY_BLE_PHY_MASK_LE_2M;
+			// Set to 1M (bug with iPhone 16 when set to 2M)
+            phyParam.rxPhyMask = CY_BLE_PHY_MASK_LE_1M;
+            phyParam.txPhyMask = CY_BLE_PHY_MASK_LE_1M;
             
             Cy_BLE_EnablePhyUpdateFeature();
             apiResult = Cy_BLE_SetPhy(&phyParam);
