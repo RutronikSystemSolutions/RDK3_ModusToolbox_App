@@ -38,14 +38,26 @@ typedef enum
 	SGP41_MEASUREMENT
 } sgp41_state_e;
 
+typedef enum
+{
+    OPTICAL_SENSOR_NONE = 0,
+    OPTICAL_SENSOR_VCNL3682XX = 1,
+    OPTICAL_SENSOR_VCNL403X = 2,
+    OPTICAL_SENSOR_VEML6031X00 = 3,
+    OPTICAL_SENSOR_VEML6046X00 = 4,
+    OPTICAL_SENSOR_VEML6030 = 5
+} optical_sensor_type_t;
+
 typedef struct
 {
 	uint8_t sensor_fusion_available;	/**< Store if the sensor fusion board is available (1) or not (0) */
 	uint8_t co2_available;				/**< Store if the CO2 board is available (1) or not (0) */
 	uint8_t ams_tof_available;			/**< Store if the AMS OSRAM TOF board is available (1) or not (0) */
 	uint8_t um980_available;			/**< Store if the UM980 board is available (1) or not (0) */
-	uint8_t vcnl4030x01_available;		/**< Store if the VNCL30x01 board is available (1) or not (0) */
 	uint8_t rab7_available;
+	uint8_t optical_sensor_available;
+
+	optical_sensor_type_t optical_sensor_type;
 
 	GasIndexAlgorithmParams gas_index_voc_params;
 	GasIndexAlgorithmParams gas_index_nox_params;
@@ -62,7 +74,8 @@ typedef struct
 	uint16_t dps310_prescaler;
 	uint16_t bmi270_prescaler;
 	uint16_t bme688_prescaler;
-	uint16_t vcnl4030x01_prescaler;
+
+	uint16_t optical_sensor_prescaler;
 
 	uint16_t bmm350_prescaler;
 

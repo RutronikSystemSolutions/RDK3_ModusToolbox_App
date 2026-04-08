@@ -53,7 +53,11 @@ notification_t* notification_fabric_create_for_bme688(bme688_scan_data_t * value
 notification_t* notification_fabric_create_for_um980(um980_gga_packet_t* packet);
 #endif
 
-notification_t* notification_fabric_create_for_vcnl4030x01(uint16_t proximity_value, uint16_t als_value, uint16_t white_value);
+notification_t* notification_fabric_create_for_vcnl3682xx(uint16_t proximity_value);
+notification_t* notification_fabric_create_for_vcnl403x(uint8_t channel_count, uint16_t ps1, uint16_t ps2, uint16_t ps3, uint8_t gesture);
+notification_t* notification_fabric_create_for_veml6030(uint16_t als_value);
+notification_t* notification_fabric_create_for_veml6031x00(uint16_t als_value, uint16_t ir_value);
+notification_t* notification_fabric_create_for_veml6046x00(uint16_t r, uint16_t g, uint16_t b, uint16_t ir);
 
 notification_t* notification_fabric_create_for_bmm350(float temp, float mag_x, float mag_y, float mag_z);
 

@@ -30,7 +30,6 @@
 #include "dio59020/dio59020.h"
 #include "dps310/dps310_app.h"
 #include "bmi270/bmi270_app.h"
-#include "vcnl4030x01/vcnl4030x01.h"
 
 #include "bmm350/bmm350_app.h"
 #include "sgp41/sgp41.h"
@@ -39,10 +38,19 @@
 #include "dps368/dps368_app.h"
 #include "bmi323/bmi323_app.h"
 
+#include "vcnl3682xx/vcnl3682xx.h"
+#include "vcnl403x/vcnl403x.h"
+#include "veml6030/veml6030.h"
+#include "veml6031x00/veml6031x00.h"
+#include "veml6046x00/veml6046x00.h"
+
+#include "gesture_control.h"
+
 #include "host_main.h"
 
 // TODO remove me
 #include <stdio.h>
+
 
 static void init_sensors_hal(rutronik_application_t* app)
 {
@@ -68,7 +76,11 @@ static void init_sensors_hal(rutronik_application_t* app)
 	um980_app_init_hal(hal_uart_readable, hal_uart_read, hal_uart_write, hal_timer_get_uticks);
 #endif
 
-	vcnl4030x01_init_hal(hal_i2c_read_register, hal_i2c_write);
+	vcnl403x_init_hal(hal_i2c_read_register, hal_i2c_write);
+	vcnl3682xx_init_hal(hal_i2c_read_register, hal_i2c_write);
+	veml6030_init_hal(hal_i2c_read_register, hal_i2c_write);
+	veml6031x00_init_hal(hal_i2c_read_register, hal_i2c_write);
+	veml6046x00_init_hal(hal_i2c_read_register, hal_i2c_write);
 
 	sgp41_init(hal_i2c_read, hal_i2c_write, hal_sleep);
 }
@@ -98,19 +110,95 @@ static int is_um980_board_available()
 }
 #endif
 
-static int is_vcnl4030x01_available()
+static optical_sensor_type_t detect_optical_sensor(void)
 {
-	uint16_t id = 0;
-	if (vcnl4030x01_read_id(&id) != 0)
-	{
-		return 0;
-	}
-	return 1;
+    uint16_t id = 0;
+
+    if (veml6030_read_id(&id) == 0)
+    {
+        printf("Detected VEML6030, id=0x%04X\r\n", id);
+        return OPTICAL_SENSOR_VEML6030;
+    }
+
+    if (vcnl3682xx_read_id(&id) == 0)
+    {
+        printf("Detected VCNL3682XX, id=0x%04X\r\n", id);
+        return OPTICAL_SENSOR_VCNL3682XX;
+    }
+
+    if (vcnl403x_read_id(&id) == 0)
+    {
+        printf("Detected VCNL403X, id=0x%04X\r\n", id);
+        return OPTICAL_SENSOR_VCNL403X;
+    }
+
+    if (veml6031x00_read_id(&id) == 0)
+    {
+        printf("Detected VEML6031X00, id=0x%04X\r\n", id);
+        return OPTICAL_SENSOR_VEML6031X00;
+    }
+
+    if (veml6046x00_read_id(&id) == 0)
+    {
+        printf("Detected VEML6046X00, id=0x%04X\r\n", id);
+        return OPTICAL_SENSOR_VEML6046X00;
+    }
+
+    printf("No optical sensor detected\r\n");
+    return OPTICAL_SENSOR_NONE;
 }
 
+
+static int init_optical_sensor(rutronik_application_t* app)
+{
+    switch (app->optical_sensor_type)
+    {
+        case OPTICAL_SENSOR_VCNL3682XX:
+            return vcnl3682xx_init();
+
+        case OPTICAL_SENSOR_VCNL403X:
+			{
+			    int retval = vcnl403x_init();
+			    if (retval == 0)
+			    {
+			        gesture_control_reset();
+			    }
+			    return retval;
+			}
+
+        case OPTICAL_SENSOR_VEML6031X00:
+            return veml6031x00_init();
+
+        case OPTICAL_SENSOR_VEML6046X00:
+            return veml6046x00_init();
+
+        case OPTICAL_SENSOR_VEML6030:
+			{
+			    int ret = veml6030_init();
+			    printf("VEML6030 init ret=%d\r\n", ret);
+			    return ret;
+			}
+
+        default:
+            return -1;
+    }
+}
+
+
+/*
+ * Check if the BMM350 sensor is responding.
+ * If the device is not available, it attempts a hardware I2C bus 
+ * recovery to resolve potential bus hangups before exiting.
+ */
 static int is_rab7_available()
 {
-	if (bmm350_app_is_available() != 1) return 0;
+
+	int available = bmm350_app_is_available();
+	if (available != 1)
+	{
+		(void)hal_i2c_recover();
+		return 0;
+	}
 	return 1;
 }
 
@@ -308,7 +396,7 @@ void rutronik_application_init(rutronik_application_t* app)
 	app->co2_available = 0;
 	app->ams_tof_available = 0;
 	app->um980_available = 0;
-	app->vcnl4030x01_available = 0;
+	app->optical_sensor_available = 0;
 	app->rab7_available = 0;
 
 	app->sgp41_state = SGP41_CONDITIONING;
@@ -316,6 +404,8 @@ void rutronik_application_init(rutronik_application_t* app)
 	app->bme690_prescaler = 0;
 	app->bmp585_prescaler = 0;
 	app->dps368_prescaler = 0;
+
+	app->optical_sensor_type = OPTICAL_SENSOR_NONE;
 
 	// Init prescalers
 	// 1 Hz prescalers -> shifted by 10ms (to avoid to many I2C read inside one loop)
@@ -326,7 +416,7 @@ void rutronik_application_init(rutronik_application_t* app)
 	app->battery_prescaler = 40;
 	app->pasco2_prescaler = 50;
 	app->dps310_prescaler = 60;
-	app->vcnl4030x01_prescaler = 70;
+	app->optical_sensor_prescaler = 70;
 	app->bmm350_prescaler =  0;
 	app->bmi323_prescaler = 0;
 
@@ -369,33 +459,78 @@ void rutronik_application_init(rutronik_application_t* app)
 		init_um980_board(app);
 	}
 #endif
-	if (is_vcnl4030x01_available() != 0)
+
+
+	app->optical_sensor_type = detect_optical_sensor();
+	if (app->optical_sensor_type != OPTICAL_SENSOR_NONE)
 	{
-		app->vcnl4030x01_available = 1;
-		// Init measurement mode
-		vcnl4030x01_init();
+	    int ret = init_optical_sensor(app);
+	    printf("optical init ret=%d type=%d\r\n", ret, app->optical_sensor_type);
+	
+	    if (ret == 0)
+	    {
+	        app->optical_sensor_available = 1;
+	        printf("optical sensor available = 1\r\n");
+	    }
+	    else
+	    {
+	        app->optical_sensor_type = OPTICAL_SENSOR_NONE;
+	        app->optical_sensor_available = 0;
+	        printf("optical sensor init failed\r\n");
+	    }
+	}
+	
+		if (is_rab7_available() != 0)
+		{
+			printf("RAB7 available!\r\n");
+			app->rab7_available = 1;
+			init_rab7(app);
+		}
 	}
 
-	if (is_rab7_available() != 0)
-	{
-		// TODO
-		printf("RAB7 available!\r\n");
-		app->rab7_available = 1;
-		init_rab7(app);
-	}
-}
+
 
 uint32_t rutronik_application_get_available_sensors_mask(rutronik_application_t* app)
 {
-	return
-			(uint32_t) app->sensor_fusion_available
-			| ((uint32_t) app->co2_available) << 1
-			| ((uint32_t) app->ams_tof_available) << 2
+		uint32_t mask = 0;	
+
+		mask	|=	(uint32_t) app->sensor_fusion_available;
+		mask	|= ((uint32_t) app->co2_available) << 1;
+		mask	|= ((uint32_t) app->ams_tof_available) << 2;
 			// << 3 is for radar board
-			| ((uint32_t) app->um980_available) << 4
-			| ((uint32_t) app->vcnl4030x01_available) << 5
-			| ((uint32_t) app->rab7_available) << 6;
+		mask	|= ((uint32_t) app->um980_available) << 4;
+		mask	|= ((uint32_t) app->optical_sensor_available) << 5;
+		mask	|= ((uint32_t) app->rab7_available) << 6;
+
+    switch (app->optical_sensor_type)
+    {
+        case OPTICAL_SENSOR_VCNL3682XX:
+            mask |= (1u << 7);
+            break;
+
+        case OPTICAL_SENSOR_VEML6031X00:
+            mask |= (1u << 10);
+            break;
+
+        case OPTICAL_SENSOR_VEML6046X00:
+            mask |= (1u << 11);
+            break;
+
+        case OPTICAL_SENSOR_VEML6030:
+            mask |= (1u << 12);
+            break;
+
+        case OPTICAL_SENSOR_VCNL403X:
+            mask |= (1u << 13);
+            break;
+
+        default:
+            break;
+    }
+
+    return mask;
 }
+
 
 #ifdef AMS_TMF_SUPPORT
 void rutronik_application_set_tmf8828_mode(rutronik_application_t* app, uint8_t mode)
@@ -643,23 +778,121 @@ void rutronik_application_do(rutronik_application_t* app)
 #endif
 
 	/**
-	 * VCNL30x01
+	 * Optical sensor
 	 */
-	if (app->vcnl4030x01_prescaler == 0)
+	if (app->optical_sensor_prescaler == 0)
 	{
-		if (app->vcnl4030x01_available)
+		if (app->optical_sensor_available)
 		{
-			uint16_t proximity_value = 0;
-			if (vcnl4030x01_get_proximity_data(&proximity_value) == 0)
-			{
-				host_main_add_notification(
-						notification_fabric_create_for_vcnl4030x01(proximity_value, 0, 0));
-			}
+			uint16_t v1 = 0;
+			uint16_t v2 = 0;
+			uint16_t v3 = 0;
+			uint16_t v4 = 0;
+
+			switch (app->optical_sensor_type)
+{
+    case OPTICAL_SENSOR_VCNL3682XX:
+        if (vcnl3682xx_get_proximity_data(&v1) == 0)
+        {
+	        printf("VCNL3682XX: Prox1=%u\r\n", v1);
+
+
+            host_main_add_notification(
+                    notification_fabric_create_for_vcnl3682xx(v1));
+        }
+        break;
+
+case OPTICAL_SENSOR_VCNL403X:
+{
+    uint8_t gesture = GESTURE_NONE;
+    vcnl403x_variant_t variant = VCNL403X_VARIANT_UNKNOWN;
+
+    // Variante abfragen (wurde in init() festgestellt)
+    if (vcnl403x_get_variant(&variant) != 0)
+    {
+        break;
+    }
+
+    // Nur beim 4035 (Gesture) müssen wir die Messung aktiv triggern
+    if (variant == VCNL403X_VARIANT_GESTURE_PS)
+    {
+        if (vcnl403x_trigger_measurement() != 0)
+        {
+            break;
+        }
+    }
+
+    // Daten abholen (Treiber setzt v2/v3 auf 0, falls 4030)
+    if (vcnl403x_get_proximity_data(&v1, &v2, &v3) == 0)
+    {
+        if (variant == VCNL403X_VARIANT_GESTURE_PS)
+        {
+            // Echte Gestenberechnung nur für VCNL4035
+            gesture = gesture_control_process_sample(v1, v2, v3);
+
+            printf("VCNL4035 (Gesture): P1=%u P2=%u P3=%u G=%u\r\n", v1, v2, v3, gesture);
+            
+            host_main_add_notification(
+                    notification_fabric_create_for_vcnl403x(3, v1, v2, v3, gesture));
+        }
+        else
+        {
+            // VCNL4030: Geste ist IMMER 0, da nur PS1 existiert
+            gesture = 0; 
+            
+            printf("VCNL4030 (Single): P1=%u\r\n", v1);
+
+            host_main_add_notification(
+                    notification_fabric_create_for_vcnl403x(1, v1, 0, 0, 0));
+        }
+    }
+}
+break;
+
+    case OPTICAL_SENSOR_VEML6031X00:
+        if ((veml6031x00_get_als_data(&v1) == 0)
+				&& (veml6031x00_get_ir_data(&v2) == 0))
+        {
+			printf("VEML6031X00: ALS=%u IR=%u\r\n", v1, v2);
+
+            host_main_add_notification(
+                    notification_fabric_create_for_veml6031x00(v1, v2));
+        }
+        break;
+
+    case OPTICAL_SENSOR_VEML6046X00:
+        if ((veml6046x00_get_r_data(&v1) == 0)
+                && (veml6046x00_get_g_data(&v2) == 0)
+                && (veml6046x00_get_b_data(&v3) == 0)
+                && (veml6046x00_get_ir_data(&v4) == 0))
+        {
+			printf("VEML6046X00: R=%u G=%u B=%u IR=%u\r\n", v1, v2, v3, v3);
+			
+            host_main_add_notification(
+                    notification_fabric_create_for_veml6046x00(v1, v2, v3, v4));
+        }
+        break;
+
+		case OPTICAL_SENSOR_VEML6030:
+		{
+		    int ret = veml6030_get_als_data(&v1);
+		    printf("VEML6030 poll: ret=%d, als=%u\r\n", ret, v1);
+		
+		    if (ret == 0)
+		    {
+		        host_main_add_notification(
+		                notification_fabric_create_for_veml6030(v1));
+		    }
+		}
+		break;
+
+    default:
+        break;
+}
 		}
 	}
-	// 2 Hz prescaler (100 Hz / 20 = 5 Hz)
-	app->vcnl4030x01_prescaler++;
-	if (app->vcnl4030x01_prescaler >= 20) app->vcnl4030x01_prescaler = 0;
+	app->optical_sensor_prescaler++;
+	if (app->optical_sensor_prescaler >= 15) app->optical_sensor_prescaler = 0;
 
 	/**
 	 * BMM350
@@ -862,4 +1095,3 @@ void rutronik_application_do(rutronik_application_t* app)
 			app->bmi323_prescaler = 0;
 	}
 }
-

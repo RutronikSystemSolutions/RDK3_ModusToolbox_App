@@ -12,6 +12,8 @@
 
 int8_t hal_i2c_init();
 
+int8_t hal_i2c_recover();
+
 int8_t hal_i2c_read(uint8_t address, uint8_t* data, uint16_t len);
 
 int8_t hal_i2c_write(uint8_t address, uint8_t* data, uint16_t len);
