@@ -400,14 +400,167 @@ notification_t* notification_fabric_create_for_vcnl4030x01(uint16_t proximity_va
 
 	uint8_t* data = (uint8_t*) malloc(notification_size);
 
-	data[0] = (uint8_t) (sensor_id & 0xFF);
-	data[1] = (uint8_t) (sensor_id >> 8);
-
+	data[0] = (uint8_t)(sensor_id & 0xFF);
+	data[1] = (uint8_t)(sensor_id >> 8);
 	data[2] = data_size;
 
 	*((uint16_t*) &data[3]) = proximity_value;
-	*((uint16_t*) &data[5]) = als_value;
-	*((uint16_t*) &data[7]) = white_value;
+
+	data[notification_size - 1] = compute_crc(data, notification_size - 1);
+
+	notification_t* retval = (notification_t*) malloc(sizeof(notification_t));
+	retval->length = notification_size;
+	retval->data = data;
+
+	return retval;
+}
+
+notification_t* notification_fabric_create_for_vcnl3682xx(uint16_t proximity_value)
+{
+	const uint8_t data_size = VCNL3682XX_DATA_SIZE;
+	const uint8_t notification_size = data_size + notification_overhead;
+	const uint16_t sensor_id = VCNL3682XX_NOTIFICATION_ID;
+
+	uint8_t* data = (uint8_t*) malloc(notification_size);
+
+	data[0] = (uint8_t)(sensor_id & 0xFF);
+	data[1] = (uint8_t)(sensor_id >> 8);
+	data[2] = data_size;
+
+	*((uint16_t*) &data[3]) = proximity_value;
+
+	data[notification_size - 1] = compute_crc(data, notification_size - 1);
+
+	notification_t* retval = (notification_t*) malloc(sizeof(notification_t));
+	retval->length = notification_size;
+	retval->data = data;
+
+	return retval;
+}
+
+
+notification_t* notification_fabric_create_for_vcnl403x(
+        uint8_t channel_count,
+        uint16_t ps1,
+        uint16_t ps2,
+        uint16_t ps3,
+        uint8_t gesture)
+{
+    uint8_t data_size = 0;
+    const uint16_t sensor_id = VCNL403X_NOTIFICATION_ID;
+
+    if (channel_count == 1)
+    {
+        data_size = VCNL403X_DATA_SIZE_SINGLE;
+    }
+    else if (channel_count == 3)
+    {
+        data_size = VCNL403X_DATA_SIZE_GESTURE;
+    }
+    else
+    {
+        return 0;
+    }
+
+    const uint8_t notification_size = data_size + notification_overhead;
+    uint8_t* data = (uint8_t*) malloc(notification_size);
+    if (data == 0)
+    {
+        return 0;
+    }
+
+    data[0] = (uint8_t)(sensor_id & 0xFF);
+    data[1] = (uint8_t)(sensor_id >> 8);
+    data[2] = data_size;
+
+    *((uint16_t*) &data[3]) = ps1;
+
+    if (channel_count == 3)
+    {
+        *((uint16_t*) &data[5]) = ps2;
+        *((uint16_t*) &data[7]) = ps3;
+        data[9] = gesture;
+    }
+
+    data[notification_size - 1] = compute_crc(data, notification_size - 1);
+
+    notification_t* retval = (notification_t*) malloc(sizeof(notification_t));
+    if (retval == 0)
+    {
+        free(data);
+        return 0;
+    }
+
+    retval->length = notification_size;
+    retval->data = data;
+
+    return retval;
+}
+
+
+notification_t* notification_fabric_create_for_veml6030(uint16_t als_value)
+{
+	const uint8_t data_size = VEML6030_DATA_SIZE;
+	const uint8_t notification_size = data_size + notification_overhead;
+	const uint16_t sensor_id = VEML6030_NOTIFICATION_ID;
+
+	uint8_t* data = (uint8_t*) malloc(notification_size);
+
+	data[0] = (uint8_t)(sensor_id & 0xFF);
+	data[1] = (uint8_t)(sensor_id >> 8);
+	data[2] = data_size;
+
+	*((uint16_t*) &data[3]) = als_value;
+
+	data[notification_size - 1] = compute_crc(data, notification_size - 1);
+
+	notification_t* retval = (notification_t*) malloc(sizeof(notification_t));
+	retval->length = notification_size;
+	retval->data = data;
+
+	return retval;
+}
+
+notification_t* notification_fabric_create_for_veml6031x00(uint16_t als_value, uint16_t ir_value)
+{
+    const uint8_t data_size = VEML6031X00_DATA_SIZE;
+    const uint8_t notification_size = data_size + notification_overhead;
+    const uint16_t sensor_id = VEML6031X00_NOTIFICATION_ID;
+
+    uint8_t* data = (uint8_t*) malloc(notification_size);
+
+    data[0] = (uint8_t)(sensor_id & 0xFF);
+    data[1] = (uint8_t)(sensor_id >> 8);
+    data[2] = data_size;
+
+    *((uint16_t*) &data[3]) = als_value;
+    *((uint16_t*) &data[5]) = ir_value;
+
+    data[notification_size - 1] = compute_crc(data, notification_size - 1);
+
+    notification_t* retval = (notification_t*) malloc(sizeof(notification_t));
+    retval->length = notification_size;
+    retval->data = data;
+
+    return retval;
+}
+
+notification_t* notification_fabric_create_for_veml6046x00(uint16_t r, uint16_t g, uint16_t b, uint16_t ir)
+{
+	const uint8_t data_size = VEML6046X00_DATA_SIZE;
+	const uint8_t notification_size = data_size + notification_overhead;
+	const uint16_t sensor_id = VEML6046X00_NOTIFICATION_ID;
+
+	uint8_t* data = (uint8_t*) malloc(notification_size);
+
+	data[0] = (uint8_t)(sensor_id & 0xFF);
+	data[1] = (uint8_t)(sensor_id >> 8);
+	data[2] = data_size;
+
+	*((uint16_t*) &data[3]) = r;
+	*((uint16_t*) &data[5]) = g;
+	*((uint16_t*) &data[7]) = b;
+	*((uint16_t*) &data[9]) = ir;
 
 	data[notification_size - 1] = compute_crc(data, notification_size - 1);
 
