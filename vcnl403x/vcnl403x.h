@@ -34,7 +34,7 @@ typedef enum
     VCNL403X_VARIANT_GESTURE_PS = 2
 } vcnl403x_variant_t;
 
-void vcnl403x_init_hal(vcnl403x_read_register_func_t read, vcnl403x_write_func_t write);
+void vcnl403x_init_hal(vcnl403x_read_register_func_t read, vcnl403x_write_func_t write, vcnl403x_sleep_func_t sleep_f);
 
 int vcnl403x_read_id(uint16_t *id);
 

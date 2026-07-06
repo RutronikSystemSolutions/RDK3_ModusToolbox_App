@@ -10,52 +10,12 @@
 
 static vcnl403x_variant_t g_vcnl403x_variant = VCNL403X_VARIANT_UNKNOWN;
 
-/**
- * @brief Detect the device variant (4030 vs 4035) without comparing for changes
- *
- * A VCNL4030 (single PS) ignores write accesses to the gesture bits.
- */
-static int detect_variant(vcnl403x_variant_t *variant)
-{
-    uint16_t reg_content = 0;
-    int retval = 0;
+static vcnl403x_sleep_func_t sleep_func;
 
-    if (variant == 0)
-    {
-        return -1;
-    }
-
-    // 1. Enable gesture mode and gesture interrupts
-    // On a VCNL4035, bit 14 and bit 15 in PS_CONF_2 are set.
-    // A VCNL4030 does not support these bits and ignores the command.
-    retval = vcnl403x_com_set_gesture_mode_on_off(1);
-    if (retval != 0) return -3;
-
-    retval = vcnl403x_com_set_gesture_interrupt_on_off(1);
-    if (retval != 0) return -4;
-
-    // 2. Read back the register to check whether the bits were accepted
-    retval = vcnl403x_com_register_read_word(VCNL403X_PS_CONF_2, &reg_content);
-    if (retval != 0) return -5;
-
-    // 3. Check bit 14 and bit 15
-    if ((reg_content & (0x3u << 14)) == (0x3u << 14))
-    {
-        // Bits are present -> gesture variant (VCNL4035)
-        *variant = VCNL403X_VARIANT_GESTURE_PS;
-    }
-    else
-    {
-        // Bits remained 0 -> standard sensor (VCNL4030)
-        *variant = VCNL403X_VARIANT_SINGLE_PS;
-    }
-
-    return 0;
-}
-
-void vcnl403x_init_hal(vcnl403x_read_register_func_t read, vcnl403x_write_func_t write)
+void vcnl403x_init_hal(vcnl403x_read_register_func_t read, vcnl403x_write_func_t write, vcnl403x_sleep_func_t sleep_f)
 {
     vcnl403x_com_init_hal(read, write);
+	sleep_func = sleep_f;
 }
 
 int vcnl403x_read_id(uint16_t *id)
@@ -75,36 +35,15 @@ int vcnl403x_read_id(uint16_t *id)
 int vcnl403x_init(void)
 {
     uint16_t device_id = 0;
-    vcnl403x_variant_t detected_variant = VCNL403X_VARIANT_UNKNOWN;
 
-    // 1. Check device ID
     int retval = vcnl403x_com_register_read_word(VCNL403X_ID, &device_id);
     if (retval != 0) return -1;
 
-    // 2. Detect variant (4035 vs 4030)
-    retval = detect_variant(&detected_variant);
-    if (retval != 0) return -2;
-
-    // 3. Stop sensor before configuration
     retval = vcnl403x_com_set_proximity_sensor_on_off(0);
     if (retval != 0) return -3;
 
-    if (detected_variant == VCNL403X_VARIANT_GESTURE_PS)
-    {
-        // 4035: enable force mode for gesture operation
-        retval = vcnl403x_com_set_active_force_on_off(1);
-        if (retval != 0) return -4;
-    }
-    else
-    {
-        // 4030: disable force mode (auto mode is smoother for single PS)
-        retval = vcnl403x_com_set_active_force_on_off(0);
-        if (retval != 0) return -5;
-
-        // Make sure gesture logic is disabled
-        vcnl403x_com_set_gesture_mode_on_off(0);
-        vcnl403x_com_set_gesture_interrupt_on_off(0);
-    }
+	// Init as 4035
+	vcnl403x_com_set_active_force_on_off(1);
 
     // Apply default settings
     vcnl403x_com_set_integration_time(VCNL403X_PS_IT_8T);
@@ -112,18 +51,37 @@ int vcnl403x_init(void)
     vcnl403x_com_set_sunlight_cancellation_on_off(1);
     vcnl403x_com_set_led_current(200);
 
-    // Re-enable gesture functionality if required
-    if (detected_variant == VCNL403X_VARIANT_GESTURE_PS)
-    {
-        vcnl403x_com_set_gesture_mode_on_off(1);
-        vcnl403x_com_set_gesture_interrupt_on_off(1);
-    }
+	// Gesture stuff
+	vcnl403x_com_set_gesture_interrupt_on_off(1);
+	vcnl403x_com_set_gesture_mode_on_off(1);
 
     // Start sensor
     retval = vcnl403x_com_set_proximity_sensor_on_off(1);
     if (retval != 0) return -14;
 
-    g_vcnl403x_variant = detected_variant;
+	// Do a measurement
+	uint16_t reg_content = 0;
+
+	vcnl403x_trigger_measurement();
+
+	sleep_func(20);
+
+	// Read VCNL403X_PS2_DATA
+    retval = vcnl403x_com_register_read_word(VCNL403X_PS2_DATA, &reg_content);
+    if (retval != 0) return -5;
+
+	if (reg_content == 0)
+	{
+		// No data for second channel -> 4030x00 version
+		g_vcnl403x_variant = VCNL403X_VARIANT_SINGLE_PS;
+		vcnl403x_com_set_proximity_sensor_on_off(0);
+		vcnl403x_com_set_active_force_on_off(0);
+		vcnl403x_com_set_gesture_mode_on_off(0);
+		vcnl403x_com_set_gesture_interrupt_on_off(0);
+		vcnl403x_com_set_proximity_sensor_on_off(1);
+	}
+	else g_vcnl403x_variant = VCNL403X_VARIANT_GESTURE_PS;
+
 
     return 0;
 }

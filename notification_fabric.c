@@ -439,58 +439,28 @@ notification_t* notification_fabric_create_for_vcnl3682xx(uint16_t proximity_val
 }
 
 
-notification_t* notification_fabric_create_for_vcnl403x(
-        uint8_t channel_count,
-        uint16_t ps1,
+notification_t* notification_fabric_create_for_vcnl4035x01(uint16_t ps1,
         uint16_t ps2,
         uint16_t ps3,
         uint8_t gesture)
 {
-    uint8_t data_size = 0;
-    const uint16_t sensor_id = VCNL403X_NOTIFICATION_ID;
-
-    if (channel_count == 1)
-    {
-        data_size = VCNL403X_DATA_SIZE_SINGLE;
-    }
-    else if (channel_count == 3)
-    {
-        data_size = VCNL403X_DATA_SIZE_GESTURE;
-    }
-    else
-    {
-        return 0;
-    }
-
+    uint8_t data_size = VCNL4035X01_DATA_SIZE;
+    const uint16_t sensor_id = VCNL4035X01_NOTIFICATION_ID;
     const uint8_t notification_size = data_size + notification_overhead;
     uint8_t* data = (uint8_t*) malloc(notification_size);
-    if (data == 0)
-    {
-        return 0;
-    }
 
     data[0] = (uint8_t)(sensor_id & 0xFF);
     data[1] = (uint8_t)(sensor_id >> 8);
     data[2] = data_size;
 
     *((uint16_t*) &data[3]) = ps1;
-
-    if (channel_count == 3)
-    {
-        *((uint16_t*) &data[5]) = ps2;
-        *((uint16_t*) &data[7]) = ps3;
-        data[9] = gesture;
-    }
+    *((uint16_t*) &data[5]) = ps2;
+    *((uint16_t*) &data[7]) = ps3;
+    data[9] = gesture;
 
     data[notification_size - 1] = compute_crc(data, notification_size - 1);
 
     notification_t* retval = (notification_t*) malloc(sizeof(notification_t));
-    if (retval == 0)
-    {
-        free(data);
-        return 0;
-    }
-
     retval->length = notification_size;
     retval->data = data;
 

@@ -76,7 +76,7 @@ static void init_sensors_hal(rutronik_application_t* app)
 	um980_app_init_hal(hal_uart_readable, hal_uart_read, hal_uart_write, hal_timer_get_uticks);
 #endif
 
-	vcnl403x_init_hal(hal_i2c_read_register, hal_i2c_write);
+	vcnl403x_init_hal(hal_i2c_read_register, hal_i2c_write, hal_sleep);
 	vcnl3682xx_init_hal(hal_i2c_read_register, hal_i2c_write);
 	veml6030_init_hal(hal_i2c_read_register, hal_i2c_write);
 	veml6031x00_init_hal(hal_i2c_read_register, hal_i2c_write);
@@ -492,15 +492,13 @@ void rutronik_application_init(rutronik_application_t* app)
 
 uint32_t rutronik_application_get_available_sensors_mask(rutronik_application_t* app)
 {
-		uint32_t mask = 0;	
-
-		mask	|=	(uint32_t) app->sensor_fusion_available;
-		mask	|= ((uint32_t) app->co2_available) << 1;
-		mask	|= ((uint32_t) app->ams_tof_available) << 2;
-			// << 3 is for radar board
-		mask	|= ((uint32_t) app->um980_available) << 4;
-		mask	|= ((uint32_t) app->optical_sensor_available) << 5;
-		mask	|= ((uint32_t) app->rab7_available) << 6;
+	uint32_t mask = 0;	
+	mask	|=	(uint32_t) app->sensor_fusion_available;
+	mask	|= ((uint32_t) app->co2_available) << 1;
+	mask	|= ((uint32_t) app->ams_tof_available) << 2;
+		// << 3 is for radar board
+	mask	|= ((uint32_t) app->um980_available) << 4;
+	mask	|= ((uint32_t) app->rab7_available) << 6;
 
     switch (app->optical_sensor_type)
     {
@@ -521,8 +519,24 @@ uint32_t rutronik_application_get_available_sensors_mask(rutronik_application_t*
             break;
 
         case OPTICAL_SENSOR_VCNL403X:
-            mask |= (1u << 13);
-            break;
+		{
+			vcnl403x_variant_t variant = VCNL403X_VARIANT_UNKNOWN;
+		    if (vcnl403x_get_variant(&variant) != 0)
+		    {
+		        break;
+		    }
+		    
+			if (variant == VCNL403X_VARIANT_GESTURE_PS)
+		    {
+		    	mask |= (1u << 13);
+		    }
+			else if (variant == VCNL403X_VARIANT_SINGLE_PS)
+			{
+				mask |= (1u << 5);
+			}
+
+			break;   
+		}
 
         default:
             break;
@@ -777,9 +791,7 @@ void rutronik_application_do(rutronik_application_t* app)
 	}
 #endif
 
-	/**
-	 * Optical sensor
-	 */
+	// Optical sensor
 	if (app->optical_sensor_prescaler == 0)
 	{
 		if (app->optical_sensor_available)
@@ -790,105 +802,81 @@ void rutronik_application_do(rutronik_application_t* app)
 			uint16_t v4 = 0;
 
 			switch (app->optical_sensor_type)
-{
-    case OPTICAL_SENSOR_VCNL3682XX:
-        if (vcnl3682xx_get_proximity_data(&v1) == 0)
-        {
-	        printf("VCNL3682XX: Prox1=%u\r\n", v1);
+			{
+			    case OPTICAL_SENSOR_VCNL3682XX:
+			        if (vcnl3682xx_get_proximity_data(&v1) == 0)
+			        {
+			            host_main_add_notification(
+			                    notification_fabric_create_for_vcnl3682xx(v1));
+			        }
+			        break;
 
+				case OPTICAL_SENSOR_VCNL403X:
+				{
+				    uint8_t gesture = GESTURE_NONE;
+				    vcnl403x_variant_t variant = VCNL403X_VARIANT_UNKNOWN;
+				
+				    if (vcnl403x_get_variant(&variant) != 0) break;
+				
+				    // In case of gesture, trigger a measurement
+				    if (variant == VCNL403X_VARIANT_GESTURE_PS)
+				    {
+				        if (vcnl403x_trigger_measurement() != 0) break;
+				    }
+				
+					// Get values. If VCNL4030, only v1 is relevant
+				    if (vcnl403x_get_proximity_data(&v1, &v2, &v3) == 0)
+				    {
+				        if (variant == VCNL403X_VARIANT_GESTURE_PS)
+				        {
+				            gesture = gesture_control_process_sample(v1, v2, v3);
+				            host_main_add_notification(
+				                    notification_fabric_create_for_vcnl4035x01(v1, v2, v3, gesture));
+				        }
+				        else
+				        {
+							// Only one channel - no gesture
+				            gesture = 0; 
+				            host_main_add_notification(
+							notification_fabric_create_for_vcnl4030x01(v1, 0, 0));
+				        }
+				    }
+				}
+				break;
 
-            host_main_add_notification(
-                    notification_fabric_create_for_vcnl3682xx(v1));
-        }
-        break;
+			    case OPTICAL_SENSOR_VEML6031X00:
+			        if ((veml6031x00_get_als_data(&v1) == 0)
+							&& (veml6031x00_get_ir_data(&v2) == 0))
+			        {
+			            host_main_add_notification(
+			                    notification_fabric_create_for_veml6031x00(v1, v2));
+			        }
+			        break;
 
-case OPTICAL_SENSOR_VCNL403X:
-{
-    uint8_t gesture = GESTURE_NONE;
-    vcnl403x_variant_t variant = VCNL403X_VARIANT_UNKNOWN;
+			    case OPTICAL_SENSOR_VEML6046X00:
+			        if ((veml6046x00_get_r_data(&v1) == 0)
+			                && (veml6046x00_get_g_data(&v2) == 0)
+			                && (veml6046x00_get_b_data(&v3) == 0)
+			                && (veml6046x00_get_ir_data(&v4) == 0))
+			        {
+			            host_main_add_notification(
+			                    notification_fabric_create_for_veml6046x00(v1, v2, v3, v4));
+			        }
+			        break;
 
-    // Variante abfragen (wurde in init() festgestellt)
-    if (vcnl403x_get_variant(&variant) != 0)
-    {
-        break;
-    }
+				case OPTICAL_SENSOR_VEML6030:
+				{
+				    int ret = veml6030_get_als_data(&v1);
+				    if (ret == 0)
+				    {
+				        host_main_add_notification(
+				                notification_fabric_create_for_veml6030(v1));
+				    }
+				}
+				break;
 
-    // Nur beim 4035 (Gesture) müssen wir die Messung aktiv triggern
-    if (variant == VCNL403X_VARIANT_GESTURE_PS)
-    {
-        if (vcnl403x_trigger_measurement() != 0)
-        {
-            break;
-        }
-    }
-
-    // Daten abholen (Treiber setzt v2/v3 auf 0, falls 4030)
-    if (vcnl403x_get_proximity_data(&v1, &v2, &v3) == 0)
-    {
-        if (variant == VCNL403X_VARIANT_GESTURE_PS)
-        {
-            // Echte Gestenberechnung nur für VCNL4035
-            gesture = gesture_control_process_sample(v1, v2, v3);
-
-            printf("VCNL4035 (Gesture): P1=%u P2=%u P3=%u G=%u\r\n", v1, v2, v3, gesture);
-            
-            host_main_add_notification(
-                    notification_fabric_create_for_vcnl403x(3, v1, v2, v3, gesture));
-        }
-        else
-        {
-            // VCNL4030: Geste ist IMMER 0, da nur PS1 existiert
-            gesture = 0; 
-            
-            printf("VCNL4030 (Single): P1=%u\r\n", v1);
-
-            host_main_add_notification(
-                    notification_fabric_create_for_vcnl403x(1, v1, 0, 0, 0));
-        }
-    }
-}
-break;
-
-    case OPTICAL_SENSOR_VEML6031X00:
-        if ((veml6031x00_get_als_data(&v1) == 0)
-				&& (veml6031x00_get_ir_data(&v2) == 0))
-        {
-			printf("VEML6031X00: ALS=%u IR=%u\r\n", v1, v2);
-
-            host_main_add_notification(
-                    notification_fabric_create_for_veml6031x00(v1, v2));
-        }
-        break;
-
-    case OPTICAL_SENSOR_VEML6046X00:
-        if ((veml6046x00_get_r_data(&v1) == 0)
-                && (veml6046x00_get_g_data(&v2) == 0)
-                && (veml6046x00_get_b_data(&v3) == 0)
-                && (veml6046x00_get_ir_data(&v4) == 0))
-        {
-			printf("VEML6046X00: R=%u G=%u B=%u IR=%u\r\n", v1, v2, v3, v3);
-			
-            host_main_add_notification(
-                    notification_fabric_create_for_veml6046x00(v1, v2, v3, v4));
-        }
-        break;
-
-		case OPTICAL_SENSOR_VEML6030:
-		{
-		    int ret = veml6030_get_als_data(&v1);
-		    printf("VEML6030 poll: ret=%d, als=%u\r\n", ret, v1);
-		
-		    if (ret == 0)
-		    {
-		        host_main_add_notification(
-		                notification_fabric_create_for_veml6030(v1));
-		    }
-		}
-		break;
-
-    default:
-        break;
-}
+			    default: break;
+			} // switch (app->optical_sensor_type)
 		}
 	}
 	app->optical_sensor_prescaler++;

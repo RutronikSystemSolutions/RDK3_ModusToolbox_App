@@ -40,7 +40,7 @@ MTB_TYPE=COMBINED
 # To change the target, it is recommended to use the Library manager
 # ('make library-manager' from command line), which will also update Eclipse IDE launch
 # configurations.
-TARGET=RDK3
+TARGET=APP_RDK3
 
 # Name of application (used to derive name of final linked file).
 #
@@ -167,7 +167,7 @@ CY_GETLIBS_SHARED_NAME=mtb_shared
 #
 # The default depends on the selected TOOLCHAIN (GCC_ARM uses the ModusToolbox
 # software provided compiler by default).
-CY_COMPILER_PATH=
+# CY_COMPILER_PATH=
 
 
 # Locate ModusToolbox helper tools folders in default installation
