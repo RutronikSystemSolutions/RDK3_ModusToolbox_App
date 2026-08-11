@@ -19,4 +19,5 @@
 #define VCNL403X_INT_FLAG        0x0D
 #define VCNL403X_ID              0x0E
 
+
 #endif /* VCNL403X_DEF_H_ */

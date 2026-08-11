@@ -545,6 +545,27 @@ uint32_t rutronik_application_get_available_sensors_mask(rutronik_application_t*
     return mask;
 }
 
+/**
+ * @brief Check if the optical sensor is made for gesture or not
+ * @retval 0: not gesture
+ * @retval 1: gesture
+ */
+static int is_vishay_gesture_sensor(rutronik_application_t* app)
+{
+	if (app->optical_sensor_type == OPTICAL_SENSOR_VCNL403X)
+	{
+		vcnl403x_variant_t variant = VCNL403X_VARIANT_UNKNOWN;
+		if (vcnl403x_get_variant(&variant) != 0)
+		{
+			return 0;
+		}
+		if (variant == VCNL403X_VARIANT_GESTURE_PS)
+		{
+			return 1;
+		}
+	}
+	return 0;
+}
 
 #ifdef AMS_TMF_SUPPORT
 void rutronik_application_set_tmf8828_mode(rutronik_application_t* app, uint8_t mode)
@@ -792,9 +813,76 @@ void rutronik_application_do(rutronik_application_t* app)
 #endif
 
 	// Optical sensor
-	if (app->optical_sensor_prescaler == 0)
+	if (app->optical_sensor_available)
 	{
-		if (app->optical_sensor_available)
+		// Gesture ? Need to be fast -> do not wait for prescaler
+		if (is_vishay_gesture_sensor(app))
+		{
+			static uint8_t gesture_measurement_started = 0;
+			static uint32_t gesture_sample_counter = 0;
+
+			uint16_t v1 = 0;
+			uint16_t v2 = 0;
+			uint16_t v3 = 0;
+
+			/*
+			 * rutronik_application_do() is called every 10 ms.
+			 * Start the first measurement on the first call.
+			 */
+			if (gesture_measurement_started == 0)
+			{
+				if (vcnl403x_trigger_measurement() == 0)
+				{
+					gesture_measurement_started = 1;
+				}
+			}
+			else
+			{
+				/*
+				 * Read the measurement that was triggered
+				 * during the previous 10 ms application cycle.
+				 */
+				if (vcnl403x_get_proximity_data(&v1, &v2, &v3) == 0)
+				{
+					uint8_t gesture = GESTURE_NONE;
+
+					// Print raw gesture sensor data as CSV
+					printf("%lu,%u,%u,%u\r\n",
+							(unsigned long)gesture_sample_counter,
+							v1,
+							v2,
+							v3);
+
+					gesture_sample_counter++;
+
+					/* Process gesture data every 10 ms */
+					gesture_control_process_sample(v1, v2, v3);
+
+					/*
+					 * Send data to the application only every 150 ms,
+					 * like the other optical sensors.
+					 */
+					if (app->optical_sensor_prescaler == 0)
+					{
+						gesture = gesture_control_get_last_gesture();
+
+						host_main_add_notification(
+								notification_fabric_create_for_vcnl4035x01(
+										v1,
+										v2,
+										v3,
+										gesture));
+					}
+				}
+
+				/*
+				 * Start the next measurement.
+				 * It will be read during the next 10 ms application cycle.
+				 */
+				vcnl403x_trigger_measurement();
+			}
+		}
+		else if (app->optical_sensor_prescaler == 0)
 		{
 			uint16_t v1 = 0;
 			uint16_t v2 = 0;
@@ -803,84 +891,69 @@ void rutronik_application_do(rutronik_application_t* app)
 
 			switch (app->optical_sensor_type)
 			{
-			    case OPTICAL_SENSOR_VCNL3682XX:
-			        if (vcnl3682xx_get_proximity_data(&v1) == 0)
-			        {
-			            host_main_add_notification(
-			                    notification_fabric_create_for_vcnl3682xx(v1));
-			        }
-			        break;
+				case OPTICAL_SENSOR_VCNL3682XX:
+					if (vcnl3682xx_get_proximity_data(&v1) == 0)
+					{
+						host_main_add_notification(
+								notification_fabric_create_for_vcnl3682xx(v1));
+					}
+					break;
 
-				case OPTICAL_SENSOR_VCNL403X:
-				{
-				    uint8_t gesture = GESTURE_NONE;
-				    vcnl403x_variant_t variant = VCNL403X_VARIANT_UNKNOWN;
-				
-				    if (vcnl403x_get_variant(&variant) != 0) break;
-				
-				    // In case of gesture, trigger a measurement
-				    if (variant == VCNL403X_VARIANT_GESTURE_PS)
-				    {
-				        if (vcnl403x_trigger_measurement() != 0) break;
-				    }
-				
-					// Get values. If VCNL4030, only v1 is relevant
-				    if (vcnl403x_get_proximity_data(&v1, &v2, &v3) == 0)
-				    {
-				        if (variant == VCNL403X_VARIANT_GESTURE_PS)
-				        {
-				            gesture = gesture_control_process_sample(v1, v2, v3);
-				            host_main_add_notification(
-				                    notification_fabric_create_for_vcnl4035x01(v1, v2, v3, gesture));
-				        }
-				        else
-				        {
-							// Only one channel - no gesture
-				            gesture = 0; 
-				            host_main_add_notification(
-							notification_fabric_create_for_vcnl4030x01(v1, 0, 0));
-				        }
-				    }
-				}
-				break;
-
-			    case OPTICAL_SENSOR_VEML6031X00:
-			        if ((veml6031x00_get_als_data(&v1) == 0)
+				case OPTICAL_SENSOR_VEML6031X00:
+					if ((veml6031x00_get_als_data(&v1) == 0)
 							&& (veml6031x00_get_ir_data(&v2) == 0))
-			        {
-			            host_main_add_notification(
-			                    notification_fabric_create_for_veml6031x00(v1, v2));
-			        }
-			        break;
+					{
+						host_main_add_notification(
+								notification_fabric_create_for_veml6031x00(v1, v2));
+					}
+					break;
 
-			    case OPTICAL_SENSOR_VEML6046X00:
-			        if ((veml6046x00_get_r_data(&v1) == 0)
-			                && (veml6046x00_get_g_data(&v2) == 0)
-			                && (veml6046x00_get_b_data(&v3) == 0)
-			                && (veml6046x00_get_ir_data(&v4) == 0))
-			        {
-			            host_main_add_notification(
-			                    notification_fabric_create_for_veml6046x00(v1, v2, v3, v4));
-			        }
-			        break;
+				case OPTICAL_SENSOR_VEML6046X00:
+					if ((veml6046x00_get_r_data(&v1) == 0)
+							&& (veml6046x00_get_g_data(&v2) == 0)
+							&& (veml6046x00_get_b_data(&v3) == 0)
+							&& (veml6046x00_get_ir_data(&v4) == 0))
+					{
+						host_main_add_notification(
+								notification_fabric_create_for_veml6046x00(
+										v1,
+										v2,
+										v3,
+										v4));
+					}
+					break;
 
 				case OPTICAL_SENSOR_VEML6030:
 				{
-				    int ret = veml6030_get_als_data(&v1);
-				    if (ret == 0)
-				    {
-				        host_main_add_notification(
-				                notification_fabric_create_for_veml6030(v1));
-				    }
+					int ret = veml6030_get_als_data(&v1);
+					if (ret == 0)
+					{
+						host_main_add_notification(
+								notification_fabric_create_for_veml6030(v1));
+					}
+					break;
 				}
-				break;
 
-			    default: break;
-			} // switch (app->optical_sensor_type)
+				case OPTICAL_SENSOR_VCNL403X:
+					// Single channel 4030x01
+					if (vcnl403x_get_proximity_data(&v1, &v2, &v3) == 0)
+					{
+							host_main_add_notification(
+									notification_fabric_create_for_vcnl4030x01(v1, 0, 0));
+					}
+					break;
+
+				default:
+					break;
+			}
 		}
 	}
+
 	app->optical_sensor_prescaler++;
-	if (app->optical_sensor_prescaler >= 15) app->optical_sensor_prescaler = 0;
+	if (app->optical_sensor_prescaler >= 15)
+	{
+		app->optical_sensor_prescaler = 0;
+	}
 
 	/**
 	 * BMM350
